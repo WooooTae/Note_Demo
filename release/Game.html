@@ -74,6 +74,10 @@
 /* Manual navigation always reveals the full illustration and awakened heroes. */
 .intro-paused .intro-picture,.intro-paused .intro-friend{opacity:1!important}
 .intro-paused .intro-friend{transform:none!important}
+/* All three class skills remain visible alongside basic attack and guard. */
+.action-buttons{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:stretch}
+.action-buttons button{min-width:0}.action-buttons button small{line-height:1.6;word-break:keep-all}.skill-note strong:not(:first-child){margin-top:9px;display:block;border-top:1px dashed #c5bba788;padding-top:8px}
+@media(max-width:650px){.action-buttons{grid-template-columns:repeat(3,minmax(0,1fr))}.action-buttons button:first-child,.action-buttons button:last-child{grid-row:2}.action-buttons button:first-child{grid-column:1/3}.action-buttons button:last-child{grid-column:3}.action-buttons button[data-action="skill"]{grid-row:1}.action-buttons button:first-child .action-icon,.action-buttons button:last-child .action-icon{width:40px;height:40px}}
 </style></head><body><div class="notebook"><header><a class="brand" href="#" id="home-link"><span class="brand-icon">✎</span> 낙서 용사단 <small>NOTEBOOK HEROES</small></a><span class="edition">첫 번째 공책 <b>·</b> PLAYABLE DEMO</span></header><main id="app"></main><footer><span>아이가 잠든 사이, 우리의 모험은 시작된다.</span><span>✧ 손그림으로 만든 작은 세상 &nbsp; / &nbsp; 01</span></footer></div><script>const roles=[
  {id:0,name:'불꽃 기사',tag:'화염 · 근접',desc:'불꽃을 두른 검으로 앞장서는 용사.',color:'#c05c3c',icon:'⚔',skill:'화염 참격',hp:120,mp:24,atk:18,cost:8,power:42,effect:'fire'},
  {id:1,name:'푸른 마법사',tag:'별빛 · 마법',desc:'작은 지팡이에 밤하늘의 힘을 담아요.',color:'#527caa',icon:'✦',skill:'별빛 마법',hp:80,mp:36,atk:12,cost:9,power:48,effect:'magic'},
@@ -84,6 +88,20 @@
  {id:6,name:'정령 소환술사',tag:'정령 · 소환',desc:'공책의 작은 여우를 동료로 불러요.',color:'#348f91',icon:'✺',skill:'별여우 소환',hp:90,mp:36,atk:13,cost:12,power:24,effect:'summon'},
  {id:7,name:'흑마법사',tag:'어둠 · 흡수',desc:'적의 잉크에서 생명력을 되찾아요.',color:'#8950a0',icon:'☾',skill:'영혼 흡수',hp:85,mp:36,atk:16,cost:10,power:44,effect:'drain'}
 ];
+// Skill definitions are authoritative; saves continue to store only combat progress.
+const skillSets=roles.map(h=>[{name:h.skill,cost:h.cost,power:h.power,effect:h.effect,...(h.heal?{heal:h.heal}:{}),...(h.effect==='protect'?{guard:'party'}:{}),...(h.effect==='summon'?{summon:true}:{}),...(h.effect==='drain'?{drain:true}:{})}]);
+const extraSkills=[
+ [{name:'불꽃 회오리',cost:12,power:26,effect:'fire',area:true},{name:'불굴의 검',cost:6,power:24,effect:'fire',guard:'self'}],
+ [{name:'유성우',cost:15,power:30,effect:'magic',area:true},{name:'별빛 집중포',cost:18,power:70,effect:'magic'}],
+ [{name:'화살비',cost:12,power:24,effect:'arrow',area:true},{name:'바람 저격',cost:14,power:62,effect:'arrow'}],
+ [{name:'여명의 결계',cost:12,power:0,heal:12,effect:'heal',guard:'party'},{name:'태양 관통',cost:14,power:55,effect:'protect'}],
+ [{name:'만개하는 기적',cost:18,power:0,heal:45,effect:'heal'},{name:'장미 가시',cost:8,power:38,effect:'magic'}],
+ [{name:'그림자 난무',cost:14,power:28,effect:'rogue',area:true},{name:'생명 훔치기',cost:8,power:36,effect:'drain',drain:true}],
+ [{name:'정령 쇄도',cost:16,power:40,effect:'summon',summon:true},{name:'정령 결계',cost:12,power:0,heal:18,effect:'heal',guard:'party'}],
+ [{name:'영혼 소용돌이',cost:16,power:26,effect:'drain',area:true,drain:true},{name:'심연의 창',cost:20,power:72,effect:'drain'}]
+];
+skillSets.forEach((list,id)=>list.push(...extraSkills[id]));
+function skillsFor(hero){return skillSets[hero.id];}
 function validParty(ids){return Array.isArray(ids)&&ids.length===4&&new Set(ids).size===4&&ids.every(id=>Number.isInteger(id)&&roles[id]);}
 const enemyDefinitions=[
  {id:0,name:'잉크의 왕',kind:'boss',hp:420,maxHp:420},
@@ -97,29 +115,30 @@ function createBattle(ids=[0,1,2,3]){
 }
 function finishVictory(state){if(state.enemies.some(e=>e.hp>0))return false;state.status='victory';state.log.push('모든 적을 물리쳤다! 보상: 별 조각 30개');return true;}
 function selectTarget(state,target){if(state.status!=='playing'||!Number.isInteger(target)||!state.enemies[target]||state.enemies[target].hp<=0)return false;state.target=target;return true;}
-function act(state,action){
+function act(state,action,skillIndex=0){
  if(state.status!=='playing'||!['attack','skill','guard'].includes(action))return false;
- const hero=state.party[state.turn];if(!hero||hero.hp<=0||(action==='skill'&&hero.mp<hero.cost))return false;
+ const hero=state.party[state.turn];
+ const ability=action==='skill'&&Number.isInteger(skillIndex)?skillsFor(hero||{})?.[skillIndex]:null;
+ if(!hero||hero.hp<=0||(action==='skill'&&(!ability||hero.mp<ability.cost)))return false;
  if(!state.enemies[state.target]||state.enemies[state.target].hp<=0)state.target=state.enemies.findIndex(e=>e.hp>0);
  if(state.target<0)return false;
- const target=state.target,enemy=state.enemies[target];
- let damage=0,healing=state.party.map(()=>0);hero.guard=false;
+ const target=state.target;
+ const healing=state.party.map(()=>0),damageByTarget=state.enemies.map(()=>0);hero.guard=false;
  if(action==='guard'){hero.guard=true;hero.mp=Math.min(hero.maxMp,hero.mp+5);state.log.push(`${hero.name}: 방어! 다음 반격 피해 감소 · MP +5`);}
- else if(action==='skill'&&hero.effect==='heal'){
-  hero.mp-=hero.cost;state.party.forEach((p,i)=>{if(p.hp>0){healing[i]=Math.min(hero.heal,p.maxHp-p.hp);p.hp+=healing[i];}});
-  state.log.push(`${hero.name}의 장미의 축복! 생존 아군 전체 HP 최대 ${hero.heal} 회복`);
- }else {
-  damage=Math.min(enemy.hp,action==='skill'?hero.power:hero.atk);
-  if(action==='skill'){
-   hero.mp-=hero.cost;
-   if(hero.effect==='protect')state.party.filter(h=>h.hp>0).forEach(h=>h.guard=true);
-   if(hero.effect==='summon'){state.summon={owner:hero.id,rounds:3};state.log.push('별여우가 나타났다! 이번 라운드부터 3회 지원 공격.');}
-   if(hero.effect==='drain'){healing[state.turn]=Math.min(Math.floor(damage/2),hero.maxHp-hero.hp);hero.hp+=healing[state.turn];}
-  }
-  enemy.hp-=damage;state.log.push(`${hero.name}의 ${action==='skill'?hero.skill:'기본 공격'} → ${enemy.name}: ${damage} 피해${hero.effect==='drain'&&action==='skill'?`, HP ${healing[state.turn]} 흡수`:''}`);
-  if(enemy.hp===0)state.log.push(`${enemy.name} 처치!`);
+ else {
+  if(ability)hero.mp-=ability.cost;
+  const power=ability?ability.power:hero.atk;
+  state.enemies.forEach((e,i)=>{if(e.hp>0&&(i===target||ability?.area)){damageByTarget[i]=Math.min(e.hp,power);e.hp-=damageByTarget[i];}});
+  if(ability?.heal)state.party.forEach((p,i)=>{if(p.hp>0){healing[i]=Math.min(ability.heal,p.maxHp-p.hp);p.hp+=healing[i];}});
+  if(ability?.guard==='party')state.party.filter(p=>p.hp>0).forEach(p=>p.guard=true);
+  if(ability?.guard==='self')hero.guard=true;
+  if(ability?.summon){state.summon={owner:hero.id,rounds:3};state.log.push('별여우가 나타났다! 이번 라운드부터 3회 지원 공격.');}
+  if(ability?.drain){healing[state.turn]=Math.min(Math.floor(damageByTarget.reduce((a,b)=>a+b,0)/2),hero.maxHp-hero.hp);hero.hp+=healing[state.turn];}
+  const result=damageByTarget.map((n,i)=>n?`${state.enemies[i].name} ${n} 피해`:null).filter(Boolean).join(' · ');
+  state.log.push(`${hero.name}의 ${ability?.name||'기본 공격'}! ${result}${ability?.heal?`생존 아군 전체 HP 최대 ${ability.heal} 회복`:''}${ability?.drain?` · HP ${healing[state.turn]} 흡수`:''}${ability?.guard?` · ${ability.guard==='party'?'아군 전체':'자신'} 보호`:''}`);
+  damageByTarget.forEach((n,i)=>{if(n>0&&state.enemies[i].hp===0)state.log.push(`${state.enemies[i].name} 처치!`);});
  }
- state.last={actor:state.turn,action,target,damage,healing,enemyHP:state.enemies.map(e=>e.hp),summonAttack:null,enemyStrikes:[],counter:false};
+ state.last={actor:state.turn,action,skillIndex:ability?skillIndex:null,skillName:ability?.name,kind:ability?.effect||hero.effect,area:!!ability?.area,guard:ability?.guard||null,drain:!!ability?.drain,target,damage:damageByTarget[target],damageByTarget,healing,enemyHP:state.enemies.map(e=>e.hp),summonAttack:null,enemyStrikes:[],counter:false};
  if(finishVictory(state))return true;
  let next=state.party.findIndex((h,i)=>i>state.turn&&h.hp>0);
  if(next===-1){
@@ -368,7 +387,7 @@ function mountScene(canvas,state,getEvent,onTarget){
    if(ev.action==='guard'&&dt<1.4){const p=ease(dt/.4);ring(c,sx,sy,47,palette[0],t*.5,1);c.save();c.globalAlpha=Math.min(1,(1.6-dt)*3);line(c,[[sx,sy-148],[sx+35,sy-130],[sx+28,sy-77],[sx,sy-53],[sx-28,sy-77],[sx-35,sy-130]],'#e7c46c',3,'#ffe8a922',true);line(c,[[sx,sy-136],[sx,sy-68]],'#fff7d6',3);c.restore();letters(c,'GUARD · MP +5',sx,sy-180,16,'#8f7937');}
    if(attack){
     if(ev.kind==='summon'&&dt>.28&&dt<1.4){const p=ease((dt-.28)/.42),fade=1-limit((dt-.95)/.45);ring(c,sx+45,sy,55,'#35a7a5',-t,fade);radiance(c,sx+45,sy-40,75,'#68e3d65a');if(skill&&dt>.4){const px=sx+50+(tx-sx-50)*p,py=sy-45+(ty-sy+45)*p-Math.sin(p*Math.PI)*65;drawExtra(c,4,px,py,70,t,false,-.13);for(let k=0;k<7;k++)spark(c,px-15-k*12,py-30+Math.sin(k+t)*9,3,'#93f5df',t+k);}else if(!skill){line(c,[[sx,sy-100],[sx+(tx-sx)*p,sy-100+(ty-sy+100)*p]],'#62d5cb',6);}}
-    if(ev.kind==='drain'&&dt>.32&&dt<1.42){const p=ease((dt-.32)/.29),fade=1-limit((dt-.98)/.44);c.save();c.globalAlpha=fade;c.beginPath();c.moveTo(sx+35,sy-105);c.bezierCurveTo(sx+130,sy-170,tx-110,ty-100,tx,ty);c.strokeStyle='#59306b';c.lineWidth=skill?12:5;c.stroke();c.strokeStyle='#cf81f0';c.lineWidth=skill?4:2;c.stroke();if(p===1){ring(c,tx,ty+30,65,'#a859cd',t,1);for(let k=0;k<7;k++){const q=((dt-.6)*1.8+k/7)%1;if(q<0)continue;const px=tx+(sx+20-tx)*q,py=ty+(sy-90-ty)*q-Math.sin(q*Math.PI)*55;oval(c,px,py,4,6,'#d4a5ef','#85439d',1);}if(skill){radiance(c,sx,sy-70,70,'#d09bea44');letters(c,ev.healing[ev.actor]?'+'+ev.healing[ev.actor]:'HP MAX',sx,sy-185,20,'#8850a6');}}c.restore();}
+    if(ev.kind==='drain'&&dt>.32&&dt<1.42){const p=ease((dt-.32)/.29),fade=1-limit((dt-.98)/.44);c.save();c.globalAlpha=fade;c.beginPath();c.moveTo(sx+35,sy-105);c.bezierCurveTo(sx+130,sy-170,tx-110,ty-100,tx,ty);c.strokeStyle='#59306b';c.lineWidth=skill?12:5;c.stroke();c.strokeStyle='#cf81f0';c.lineWidth=skill?4:2;c.stroke();if(p===1){ring(c,tx,ty+30,65,'#a859cd',t,1);for(let k=0;k<7;k++){const q=((dt-.6)*1.8+k/7)%1;if(q<0)continue;const px=tx+(sx+20-tx)*q,py=ty+(sy-90-ty)*q-Math.sin(q*Math.PI)*55;oval(c,px,py,4,6,'#d4a5ef','#85439d',1);}if(skill&&ev.drain){radiance(c,sx,sy-70,70,'#d09bea44');letters(c,ev.healing[ev.actor]?'+'+ev.healing[ev.actor]:'HP MAX',sx,sy-185,20,'#8850a6');}}c.restore();}
     if(ev.kind==='fire'&&dt>.45&&dt<1.32){const p=ease((dt-.45)/.35),fade=1-limit((dt-.92)/.4);slash(c,tx,ty,p,skill?['#e95a19','#ffb52e','#fff4b5']:['#a5afb7','#dee7eb','#fffdf5'],-.75,skill?1.15:.8,fade);if(skill){for(let k=0;k<13;k++){const a=-2.8+k*.3,r=130+(k%3)*12;const fx=tx+Math.cos(a)*r,fy=ty+Math.sin(a)*90;c.save();c.globalAlpha=fade;line(c,[[fx,fy],[fx+Math.cos(a)*15,fy-28-(k%4)*6],[fx+10,fy-6],[fx+22,fy-17],[fx+11,fy+8]],null,0,k%2?'#ffb83e':'#f06b20',true);c.restore();}}}
     if((ev.kind==='magic'||ev.kind==='heal')&&dt>.3&&dt<1.25){
      const p=ease((dt-.31)/.31),px=sx+(tx-sx)*p,py=sy-115+(ty-sy+115)*p;const color=ev.kind==='heal'?palettes[4]:palettes[1];
@@ -376,12 +395,14 @@ function mountScene(canvas,state,getEvent,onTarget){
      if(age>=0){const r=ease(age/.4)*(skill?125:65);c.save();c.globalAlpha=1-limit(age/.65);for(let k=0;k<3;k++)oval(c,tx,ty,r+k*7,r+k*7,null,color[k],3-k*.6);for(let k=0;k<8;k++){const a=k*Math.PI/4+t*.2;spark(c,tx+Math.cos(a)*r,ty+Math.sin(a)*r,5,color[1],a);}c.restore();}
     }
     if(ev.kind==='arrow'&&dt>.3&&dt<1.25){const count=skill?5:1;for(let k=0;k<count;k++){const travel=limit((dt-.32-k*.045)/.26),endY=ty+(k-(count-1)/2)*19;const px=sx+(tx-sx)*travel,py=sy-100+(endY-sy+100)*travel;c.save();c.globalAlpha=1-limit((dt-.78-k*.03)/.3);line(c,[[px-105,py+4],[px,py]],'#9fcf5b55',9);line(c,[[px-85,py+2],[px,py]],'#6c9e3d',2.5);line(c,[[px-13,py-7],[px+3,py],[px-14,py+8]],'#fff2b4',3);line(c,[[px-70,py],[px-81,py-9],[px-76,py+1],[px-85,py+8]],'#44652c',2);c.restore();}if(skill&&age>=0&&age<.45){c.save();c.globalAlpha=1-age/.45;for(let k=0;k<8;k++)spark(c,tx+Math.sin(k*2.1)*65,ty+Math.cos(k*2.1)*65,7,'#91b84d',k);c.restore();}}
-    if(ev.kind==='protect'&&dt>.38&&dt<1.35){const p=ease((dt-.38)/.25),fade=1-limit((dt-.9)/.4);c.save();c.globalAlpha=fade;line(c,[[tx-270,ty+20],[tx+85*p,ty-10]],'#f5bf3177',27);line(c,[[tx-240,ty+17],[tx+85*p,ty-10]],'#ffeb8f',12);line(c,[[tx-170,ty+13],[tx+85*p,ty-10]],'#fffef2',4);spark(c,tx+40,ty,46,'#ffe47e',Math.PI/4);c.restore();if(skill&&age>=0)for(const [x,y] of positions){ring(c,x,y,48,'#d6ae38',t,fade);oval(c,x,y-75,48,86,'#f5db6c0d','#e8bf5090',1.5);}}
+    if(ev.kind==='protect'&&dt>.38&&dt<1.35){const p=ease((dt-.38)/.25),fade=1-limit((dt-.9)/.4);c.save();c.globalAlpha=fade;line(c,[[tx-270,ty+20],[tx+85*p,ty-10]],'#f5bf3177',27);line(c,[[tx-240,ty+17],[tx+85*p,ty-10]],'#ffeb8f',12);line(c,[[tx-170,ty+13],[tx+85*p,ty-10]],'#fffef2',4);spark(c,tx+40,ty,46,'#ffe47e',Math.PI/4);c.restore();if(skill&&ev.guard==='party'&&age>=0)for(const [x,y] of positions){ring(c,x,y,48,'#d6ae38',t,fade);oval(c,x,y-75,48,86,'#f5db6c0d','#e8bf5090',1.5);}}
     if(ev.kind==='rogue'&&dt>.43&&dt<1.4){const fade=1-limit((dt-1)/.4);slash(c,tx-6,ty,ease((dt-.43)/.28),['#4b256e','#b781ef','#fff0ff'],-.7,skill?.95:.7,fade);if(skill&&dt>.63)slash(c,tx+10,ty,ease((dt-.63)/.23),['#5e3291','#d9aaff','#ffffff'],.7,1,fade);}
     if(age>=0&&age<.85){spray(c,tx,ty,age*1.2,palette,skill?48:22,skill?1.1:.65);if(age<.4)radiance(c,tx,ty,100*(1-age/.4),palette[1]+'66');letters(c,'−'+ev.damage,tx,ty-90-ease(age/.8)*28,skill?36:26,palette[0]);}
     if(age>=0&&age<.16&&!reduced){c.save();c.globalAlpha=(1-age/.16)*.1;c.fillStyle=palette[2];c.fillRect(50,95,W-70,H-135);c.restore();}
    }
    if(heal&&dt>.35&&dt<1.5){for(let i=0;i<4;i++){if(state.party[i].hp<=0)continue;const [x,y]=positions[i],p=limit((dt-.35)/1.15),fade=Math.sin(p*Math.PI);radiance(c,x,y-70,95,'#ee9fc74a');ring(c,x,y,50,'#c979a3',-t,fade);c.save();c.globalAlpha=fade;for(let k=0;k<8;k++){const a=k*2.4;const px=x+Math.sin(a+t)*38,py=y-25-(p*110+k*17)%130;oval(c,px,py,3,7,'#edb1c9','#c06f97',.7);spark(c,px+10,py+15,3,'#fff5c9',a);}c.restore();letters(c,ev.healing[i]?'+'+ev.healing[i]:'HP MAX',x,y-170-ease(p)*15,ev.healing[i]?23:13,'#b8628a');}}
+   if(skill&&ev.guard&&age>=0&&age<.85){positions.forEach(([x,y],i)=>{if(state.party[i].hp<=0||(ev.guard==='self'&&i!==ev.actor))return;ring(c,x,y,50,palette[0],t,1-age/.85);oval(c,x,y-75,48,86,palette[1]+'11',palette[1]+'aa',2);});}
+   if(skill&&ev.area&&age>=0&&age<.85){state.enemies.forEach((e,i)=>{if(i===ev.target||!ev.damageByTarget[i])return;const [x,y]=enemyPositions[i],fy=y-70,fade=1-age/.85;ring(c,x,y-10,62,palette[0],t,fade);spray(c,x,fy,age*1.2,palette,36,1);if(ev.kind==='fire'||ev.kind==='rogue')slash(c,x,fy,ease(age/.25),palette,-.6,1,fade);else if(ev.kind==='arrow'){for(let k=0;k<4;k++)line(c,[[x-55+k*22,fy-100+age*80],[x-20+k*22,fy-15+age*80]],palette[1],3);}else{radiance(c,x,fy,90*fade,palette[1]+'66');spark(c,x,fy,40*fade,palette[1],t);}letters(c,'−'+ev.damageByTarget[i],x,fy-70-ease(age/.8)*28,28,palette[0]);});}
    if(ev.summonAttack&&dt>=1.12&&dt<1.6){const [ex,ey]=enemyPositions[ev.summonAttack.target];spray(c,ex,ey-60,(dt-1.12)*2,['#269e9e','#95ffdf','#edfffa'],22,.65);letters(c,'정령 −'+ev.summonAttack.damage,ex,ey-130-(dt-1.12)*25,18,'#288f8e');}
    if(bossStrikes&&enemyT>=0&&enemyT<1.2){
     if(enemyT<.35){letters(c,ev.heavy?'잉크 폭발 준비!':'잉크가 번지고 있다…',kingX-15,102,18,'#6e448b');radiance(c,kingX,kingY-120,60+enemyT*80,'#8a45b377');}
@@ -390,7 +411,7 @@ function mountScene(canvas,state,getEvent,onTarget){
      for(let k=0;k<24;k++){const xx=ex+Math.sin(k*3.2)*90,yy=kingY-120+Math.cos(k*3.2)*125;oval(c,xx,yy,2+k%4,3+k%3,k%2?'#382442':'#78469b');}
      c.restore();if(enemyHit)letters(c,ev.heavy?'잉크 폭발!':'잉크 파동!',550,115,27,'#6d3c8c');}
    }
-   if(skill&&dt<.58){c.save();c.globalAlpha=Math.min(1,dt/.12)*Math.min(1,(.58-dt)/.12);line(c,[[385,90],[710,90]],'#eee7d3',34);letters(c,state.party[ev.actor].skill,548,97,21,palette[0]);c.restore();}
+   if(skill&&dt<.58){c.save();c.globalAlpha=Math.min(1,dt/.12)*Math.min(1,(.58-dt)/.12);line(c,[[385,90],[710,90]],'#eee7d3',34);letters(c,ev.skillName||state.party[ev.actor].skill,548,97,21,palette[0]);c.restore();}
    if(enemyHit&&!bossStrikes)letters(c,'몬스터 반격!',550,115,23,'#735087');
    if(attack&&age>=0&&!impactSound){impactSound=true;sound('hit',ev.sound);}
    if(enemyHit&&!counterSound){counterSound=true;sound('hit',ev.sound);}
@@ -478,7 +499,7 @@ function showIntro(after){
 }
 function showParty(mode='start',notice=''){
  cancelScene();document.body.classList.remove('title-view');
- app.innerHTML=`<section class="roster-page"><div class="roster-heading"><div><span class="eyebrow">OUR LITTLE HEROES / 08</span><h1>오늘 밤, 누구와 떠날까요?</h1><p>용사 4명을 골라주세요. 선택한 순서대로 행동합니다.</p></div><button class="plain" id="roster-back">← 메인으로</button></div><div class="party-slots">${[0,1,2,3].map((_,slot)=>{const id=selected[slot];return `<div class="party-slot ${id===undefined?'empty':''}"><b>0${slot+1}</b>${id===undefined?'<span>친구를 선택하세요</span>':`<span style="color:${roles[id].color}">${roles[id].icon} ${roles[id].name}</span>`}</div>`;}).join('')}</div><div class="roster-grid">${roles.map((h,i)=>{const order=selected.indexOf(i);return `<button class="roster-card ${order>=0?'chosen':''}" data-select="${i}" aria-pressed="${order>=0}" style="--hero:${h.color}"><span class="card-number">${order>=0?'✓ '+(order+1)+'번째 동료':'선택하기'}</span>${i>=6?'<span class="new-badge">NEW</span>':''}<div class="portrait-wash">${doodle(i)}</div><small class="role-tag">${h.tag}</small><h2>${h.name}</h2><p>${h.desc}</p><div class="card-stats"><span>HP <b>${h.hp}</b></span><span>MP <b>${h.mp}</b></span></div><div class="skill-note"><strong>${h.icon} ${h.skill}</strong><small>${skillSummary(h)} · MP ${h.cost}</small></div></button>`;}).join('')}</div><div class="roster-confirm"><div><strong>선택한 친구 <span>${selected.length} / 4</span></strong><p role="status" aria-live="polite">${notice||'선택한 카드를 다시 누르면 편성에서 빠집니다.'}</p></div><button class="primary" id="confirm-party" ${selected.length===4?'':'disabled'}>${mode==='start'?'이 용사단으로 모험 시작':'편성 저장'} →</button></div></section>`;
+ app.innerHTML=`<section class="roster-page"><div class="roster-heading"><div><span class="eyebrow">OUR LITTLE HEROES / 08</span><h1>오늘 밤, 누구와 떠날까요?</h1><p>용사 4명을 골라주세요. 선택한 순서대로 행동합니다.</p></div><button class="plain" id="roster-back">← 메인으로</button></div><div class="party-slots">${[0,1,2,3].map((_,slot)=>{const id=selected[slot];return `<div class="party-slot ${id===undefined?'empty':''}"><b>0${slot+1}</b>${id===undefined?'<span>친구를 선택하세요</span>':`<span style="color:${roles[id].color}">${roles[id].icon} ${roles[id].name}</span>`}</div>`;}).join('')}</div><div class="roster-grid">${roles.map((h,i)=>{const order=selected.indexOf(i);return `<button class="roster-card ${order>=0?'chosen':''}" data-select="${i}" aria-pressed="${order>=0}" style="--hero:${h.color}"><span class="card-number">${order>=0?'✓ '+(order+1)+'번째 동료':'선택하기'}</span>${i>=6?'<span class="new-badge">NEW</span>':''}<div class="portrait-wash">${doodle(i)}</div><small class="role-tag">${h.tag}</small><h2>${h.name}</h2><p>${h.desc}</p><div class="card-stats"><span>HP <b>${h.hp}</b></span><span>MP <b>${h.mp}</b></span></div><div class="skill-note">${skillsFor(h).map(sk=>`<strong>${sk.name} · MP ${sk.cost}</strong><small>${skillSummary(sk)}</small>`).join('')}</div></button>`;}).join('')}</div><div class="roster-confirm"><div><strong>선택한 친구 <span>${selected.length} / 4</span></strong><p role="status" aria-live="polite">${notice||'선택한 카드를 다시 누르면 편성에서 빠집니다.'}</p></div><button class="primary" id="confirm-party" ${selected.length===4?'':'disabled'}>${mode==='start'?'이 용사단으로 모험 시작':'편성 저장'} →</button></div></section>`;
  document.querySelector('#roster-back').onclick=()=>{selected=initialParty();home();};
  document.querySelectorAll('[data-select]').forEach(b=>b.onclick=()=>{const id=Number(b.dataset.select);if(selected.includes(id))selected=selected.filter(x=>x!==id);else if(selected.length<4)selected.push(id);else{showParty(mode,'이미 4명입니다. 바꿀 친구를 먼저 선택 해제해주세요.');document.querySelector(`[data-select="${id}"]`).focus({preventScroll:true});return;}showParty(mode);document.querySelector(`[data-select="${id}"]`).focus({preventScroll:true});});
  document.querySelector('#confirm-party').onclick=()=>{
@@ -493,12 +514,15 @@ function confirmNewGame(){
 }
 function start(ids=selected){cancelScene();selected=[...ids];writeStorage(PARTY_KEY,JSON.stringify(selected));state=createBattle(selected);saveProgress();render();}
 function skillSummary(h){
- if(h.effect==='heal')return '전체 HP '+h.heal+' 회복';
- if(h.effect==='protect')return '피해 '+h.power+' + 전체 보호';
- if(h.effect==='summon')return '피해 '+h.power+' + 정령 3회 지원';
- if(h.effect==='drain')return '피해 '+h.power+' + 피해의 50% 흡수';
- return '선택한 적에게 '+h.power+' 피해';
+ const parts=[];
+ if(h.power)parts.push((h.area?'적 전체 ':'선택한 적 ')+h.power+' 피해');
+ if(h.heal)parts.push('아군 전체 HP '+h.heal+' 회복');
+ if(h.guard)parts.push(h.guard==='party'?'아군 전체 보호':'자신 보호');
+ if(h.summon)parts.push('정령 3회 지원');
+ if(h.drain)parts.push('총 피해의 50% 흡수');
+ return parts.join(' · ');
 }
+function skillButtons(h){return skillsFor(h).map((sk,i)=>`<button data-action="skill" data-skill="${i}" ${busy||h.mp<sk.cost?'disabled':''} aria-label="${sk.name}, MP ${sk.cost}, ${skillSummary(sk)}${h.mp<sk.cost?', MP 부족':''}">${actionIcon(sk.effect)}<span>${sk.name}</span><small>MP ${sk.cost}${h.mp<sk.cost?' · MP 부족':''}</small><small>${skillSummary(sk)}</small></button>`).join('');}
 function targetControls(){return `<section class="target-panel" aria-label="공격 대상 선택"><div><strong>공격 대상</strong><small>적 또는 카드를 눌러 선택 · 모두 처치하면 승리</small></div><div class="target-buttons">${state.enemies.map((e,i)=>`<button data-target="${i}" class="target-button ${state.target===i?'target-selected':''} ${e.hp===0?'defeated':''}" aria-pressed="${state.target===i}" ${e.hp===0||state.status!=='playing'?'disabled':''}><span>${['♛','●','☠'][i]} ${e.name}</span><small>${e.hp===0?'처치':e.hp+' / '+e.maxHp}</small><i style="--hp:${e.hp/e.maxHp*100}%"></i></button>`).join('')}</div></section>`;}
 function chooseTarget(id){if(busy||!state||!selectTarget(state,id))return;saveProgress();render();}
 function updateEnemyDisplay(hps){
@@ -511,13 +535,13 @@ function actionIcon(kind){
  const paths={attack:'M14 61 Q32 21 67 13 Q39 42 14 61 M23 66 L66 25',fire:'M14 65 Q8 43 43 14 Q30 39 48 32 L68 10 Q64 61 14 65 M22 60 Q45 47 54 31',magic:'M40 8 L46 30 L70 40 L46 46 L40 72 L33 48 L10 40 L33 31 Z M13 13 L20 20 M64 64 L70 70',arrow:'M9 62 L65 17 M47 18 L68 13 L64 35 M18 71 L73 28 M12 43 L52 10',protect:'M8 65 L62 13 M48 15 L70 7 L62 31 M28 37 L43 51 M14 49 L30 65',heal:'M40 17 C12 -1 8 36 40 60 C72 36 68 -1 40 17 Z M40 25 L40 46 M30 35 L50 35',rogue:'M12 65 Q13 31 62 12 L44 42 Z M67 65 Q66 31 17 12 L35 42 Z',summon:'M15 23 L35 28 L40 34 L45 28 L65 23 L65 61 L45 66 L40 61 L35 66 L15 61 Z M40 34 L40 61 M29 11 L32 18 M51 11 L48 18',drain:'M55 12 Q15 13 15 40 Q15 65 55 68 Q37 54 37 40 Q37 26 55 12 Z M60 28 L65 38 L60 48 L55 38 Z',guard:'M40 9 L66 19 L61 49 L40 70 L19 49 L14 19 Z M40 18 L40 57 M24 30 L56 30'};
  return `<svg class="action-icon" viewBox="0 0 80 80" aria-hidden="true"><rect x="3" y="3" width="74" height="74" rx="3" fill="${colors[kind]}" stroke="#302c31" stroke-width="3"/><path d="${paths[kind]}" fill="none" stroke="#ffcc6e" stroke-width="9" opacity=".45" stroke-linecap="round" stroke-linejoin="round"/><path d="${paths[kind]}" fill="none" stroke="#fff9d9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
-function render(){const done=state.status!=='playing';const h=state.party[state.turn];document.body.classList.remove('title-view');app.innerHTML=`<section class="battle-top"><div><span class="eyebrow">CHAPTER 01 / 낙서의 숲</span><h1>첫 페이지를 지켜라!</h1><small class="save-status">${storageFailed?'자동 저장을 사용할 수 없습니다':'✎ 행동이 끝날 때마다 자동 저장됩니다'}</small></div><div class="battle-nav"><button class="plain" id="sound" aria-pressed="${soundEnabled}">효과음 ${soundEnabled?'ON':'OFF'}</button><button class="plain" id="back">← 공책으로</button></div></section><section class="arena"><div class="enemy-info"><span>♛ 잉크의 왕 <small>${state.enemy.hp} / ${state.enemy.maxHp}</small></span><div class="bar enemy-bar"><i style="width:${state.enemy.hp/state.enemy.maxHp*100}%"></i></div><p>${state.enemy.hp>0?'다음 반격: '+(state.round%3===0?'잉크 폭발 · 전체 30 피해':'잉크 파동 · 전체 18 피해'):'보스 처치! 남은 몬스터를 물리치세요'}</p></div><span class="round">TURN<br><b>${String(state.round).padStart(2,'0')}</b></span><canvas id="battle-scene" role="img" aria-label="용사 네 명과 잉크의 왕이 싸우는 애니메이션 전장"></canvas><div class="scene-label"><span>✎ NOTEBOOK HEROES</span><span id="action-caption">${done?'오늘 밤의 이야기를 기록했어요.':h.name+' · 행동을 선택하세요'}</span></div></section>${targetControls()}<div class="battle-bottom"><section class="battle-control"><div class="party-stats">${state.party.map((p,i)=>`<div class="stat ${!done&&state.turn===i?'selected':''} ${p.hp===0?'fallen':''}" style="--hero:${p.color}"><canvas class="hero-portrait stat-portrait" data-hero="${p.id}" aria-hidden="true"></canvas><strong>${p.name}</strong><span>HP ${p.hp} / ${p.maxHp}</span><div class="bar"><i style="width:${p.hp/p.maxHp*100}%"></i></div><small>MP ${p.mp} / ${p.maxMp} ${p.guard?'· 방어 중':''}${state.summon?.owner===p.id?' · 정령 '+state.summon.rounds+'회':''}</small></div>`).join('')}</div>${done?`<div class="result"><h2>${state.status==='victory'?'✧ 첫 페이지를 지켰어요!':'☾ 잠시 쉬어가도 괜찮아요.'}</h2><p>${state.status==='victory'?'획득 보상: 별 조각 30개 · 데모 전투 완료':'용사단이 모두 쓰러졌습니다. 방어로 MP를 회복해보세요.'}</p><button class="primary" id="retry">다시 도전하기 ↗</button></div>`:`<div class="actions"><div><small>${busy?'행동을 기록하는 중…':'당신의 선택을 기다리고 있어요'}</small><h2>${h.name}의 차례</h2></div><div class="action-buttons"><button data-action="attack" ${busy?'disabled':''}>${actionIcon('attack')}<span>공격</span><small>기본 피해 ${h.atk}</small></button><button data-action="skill" ${busy||h.mp<h.cost?'disabled':''}>${actionIcon(h.effect)}<span>${h.skill}</span><small>MP ${h.cost} · ${skillSummary(h)}</small></button><button data-action="guard" ${busy?'disabled':''}>${actionIcon('guard')}<span>방어</span><small>피해 65% 감소 · MP +5</small></button></div></div>`}</section><aside class="journal"><h3>✎ 모험의 기록</h3><div role="log" aria-live="polite">${state.log.slice(-5).map(l=>`<p>${escapeHTML(l)}</p>`).join('')}</div></aside></div>`;document.querySelector('#back').onclick=home;if(done)document.querySelector('#retry').onclick=()=>start(state.party.map(p=>p.id));document.querySelector('#sound').onclick=()=>{soundEnabled=!soundEnabled;const b=document.querySelector('#sound');b.textContent='효과음 '+(soundEnabled?'ON':'OFF');b.setAttribute('aria-pressed',soundEnabled);sound('magic',soundEnabled);};mountScene(document.querySelector('#battle-scene'),state,()=>event,chooseTarget);paintPortraits();document.querySelectorAll('[data-target]').forEach(b=>b.onclick=()=>chooseTarget(Number(b.dataset.target)));document.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>playAction(b.dataset.action));}
-function playAction(action){
+function render(){const done=state.status!=='playing';const h=state.party[state.turn];document.body.classList.remove('title-view');app.innerHTML=`<section class="battle-top"><div><span class="eyebrow">CHAPTER 01 / 낙서의 숲</span><h1>첫 페이지를 지켜라!</h1><small class="save-status">${storageFailed?'자동 저장을 사용할 수 없습니다':'✎ 행동이 끝날 때마다 자동 저장됩니다'}</small></div><div class="battle-nav"><button class="plain" id="sound" aria-pressed="${soundEnabled}">효과음 ${soundEnabled?'ON':'OFF'}</button><button class="plain" id="back">← 공책으로</button></div></section><section class="arena"><div class="enemy-info"><span>♛ 잉크의 왕 <small>${state.enemy.hp} / ${state.enemy.maxHp}</small></span><div class="bar enemy-bar"><i style="width:${state.enemy.hp/state.enemy.maxHp*100}%"></i></div><p>${state.enemy.hp>0?'다음 반격: '+(state.round%3===0?'잉크 폭발 · 전체 30 피해':'잉크 파동 · 전체 18 피해'):'보스 처치! 남은 몬스터를 물리치세요'}</p></div><span class="round">TURN<br><b>${String(state.round).padStart(2,'0')}</b></span><canvas id="battle-scene" role="img" aria-label="용사 네 명과 잉크의 왕이 싸우는 애니메이션 전장"></canvas><div class="scene-label"><span>✎ NOTEBOOK HEROES</span><span id="action-caption">${done?'오늘 밤의 이야기를 기록했어요.':h.name+' · 행동을 선택하세요'}</span></div></section>${targetControls()}<div class="battle-bottom"><section class="battle-control"><div class="party-stats">${state.party.map((p,i)=>`<div class="stat ${!done&&state.turn===i?'selected':''} ${p.hp===0?'fallen':''}" style="--hero:${p.color}"><canvas class="hero-portrait stat-portrait" data-hero="${p.id}" aria-hidden="true"></canvas><strong>${p.name}</strong><span>HP ${p.hp} / ${p.maxHp}</span><div class="bar"><i style="width:${p.hp/p.maxHp*100}%"></i></div><small>MP ${p.mp} / ${p.maxMp} ${p.guard?'· 방어 중':''}${state.summon?.owner===p.id?' · 정령 '+state.summon.rounds+'회':''}</small></div>`).join('')}</div>${done?`<div class="result"><h2>${state.status==='victory'?'✧ 첫 페이지를 지켰어요!':'☾ 잠시 쉬어가도 괜찮아요.'}</h2><p>${state.status==='victory'?'획득 보상: 별 조각 30개 · 데모 전투 완료':'용사단이 모두 쓰러졌습니다. 방어로 MP를 회복해보세요.'}</p><button class="primary" id="retry">다시 도전하기 ↗</button></div>`:`<div class="actions"><div><small>${busy?'행동을 기록하는 중…':'당신의 선택을 기다리고 있어요'}</small><h2>${h.name}의 차례</h2></div><div class="action-buttons"><button data-action="attack" ${busy?'disabled':''}>${actionIcon('attack')}<span>공격</span><small>기본 피해 ${h.atk}</small></button>${skillButtons(h)}<button data-action="guard" ${busy?'disabled':''}>${actionIcon('guard')}<span>방어</span><small>피해 65% 감소 · MP +5</small></button></div></div>`}</section><aside class="journal"><h3>✎ 모험의 기록</h3><div role="log" aria-live="polite">${state.log.slice(-5).map(l=>`<p>${escapeHTML(l)}</p>`).join('')}</div></aside></div>`;document.querySelector('#back').onclick=home;if(done)document.querySelector('#retry').onclick=()=>start(state.party.map(p=>p.id));document.querySelector('#sound').onclick=()=>{soundEnabled=!soundEnabled;const b=document.querySelector('#sound');b.textContent='효과음 '+(soundEnabled?'ON':'OFF');b.setAttribute('aria-pressed',soundEnabled);sound('magic',soundEnabled);};mountScene(document.querySelector('#battle-scene'),state,()=>event,chooseTarget);paintPortraits();document.querySelectorAll('[data-target]').forEach(b=>b.onclick=()=>chooseTarget(Number(b.dataset.target)));document.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>playAction(b.dataset.action,Number(b.dataset.skill||0)));}
+function playAction(action,skillIndex=0){
  if(busy||state.status!=='playing')return;
  const next=structuredClone(state),actor=state.turn;
- if(!act(next,action))return;
+ if(!act(next,action,skillIndex))return;
  busy=true;
- event={sound:soundEnabled,actor,kind:state.party[actor].effect,action,start:performance.now(),damage:next.last.damage,healing:next.last.healing,target:next.last.target,afterAction:next.last.enemyHP,afterSupport:next.enemies.map(e=>e.hp),summonAttack:next.last.summonAttack,enemyStrikes:next.last.enemyStrikes,counter:next.last.counter,heavy:state.round%3===0,damageTaken:state.party.map((p,i)=>p.hp+next.last.healing[i]-next.party[i].hp)};
+ event={sound:soundEnabled,actor,kind:next.last.kind,skillName:next.last.skillName,area:next.last.area,guard:next.last.guard,drain:next.last.drain,damageByTarget:next.last.damageByTarget,action,start:performance.now(),damage:next.last.damage,healing:next.last.healing,target:next.last.target,afterAction:next.last.enemyHP,afterSupport:next.enemies.map(e=>e.hp),summonAttack:next.last.summonAttack,enemyStrikes:next.last.enemyStrikes,counter:next.last.counter,heavy:state.round%3===0,damageTaken:state.party.map((p,i)=>p.hp+next.last.healing[i]-next.party[i].hp)};
  event.onImpact=()=>{
   updateEnemyDisplay(next.last.enemyHP);
   document.querySelectorAll('.stat').forEach((el,i)=>{
@@ -530,7 +554,7 @@ function playAction(action){
  event.onSummon=()=>updateEnemyDisplay(next.enemies.map(e=>e.hp));
  event.onCounter=()=>document.querySelectorAll('.stat').forEach((el,i)=>{el.querySelector('span').textContent='HP '+next.party[i].hp+' / '+next.party[i].maxHp;el.querySelector('.bar i').style.width=next.party[i].hp/next.party[i].maxHp*100+'%';});
  document.querySelectorAll('[data-action],[data-target]').forEach(b=>b.disabled=true);
- document.querySelector('#action-caption').textContent=state.party[actor].name+' · '+(action==='skill'?state.party[actor].skill:action==='guard'?'수호 태세':'기본 공격');
+ document.querySelector('#action-caption').textContent=state.party[actor].name+' · '+(action==='skill'?next.last.skillName:action==='guard'?'수호 태세':'기본 공격');
  sound(['magic','heal','summon','drain'].includes(event.kind)?'magic':'hit',soundEnabled);
  timer=setTimeout(()=>{state=next;event=null;busy=false;saveProgress();render();},animationDuration(event.counter));
 }

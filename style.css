@@ -74,3 +74,7 @@
 /* Manual navigation always reveals the full illustration and awakened heroes. */
 .intro-paused .intro-picture,.intro-paused .intro-friend{opacity:1!important}
 .intro-paused .intro-friend{transform:none!important}
+/* All three class skills remain visible alongside basic attack and guard. */
+.action-buttons{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:stretch}
+.action-buttons button{min-width:0}.action-buttons button small{line-height:1.6;word-break:keep-all}.skill-note strong:not(:first-child){margin-top:9px;display:block;border-top:1px dashed #c5bba788;padding-top:8px}
+@media(max-width:650px){.action-buttons{grid-template-columns:repeat(3,minmax(0,1fr))}.action-buttons button:first-child,.action-buttons button:last-child{grid-row:2}.action-buttons button:first-child{grid-column:1/3}.action-buttons button:last-child{grid-column:3}.action-buttons button[data-action="skill"]{grid-row:1}.action-buttons button:first-child .action-icon,.action-buttons button:last-child .action-icon{width:40px;height:40px}}

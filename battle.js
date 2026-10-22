@@ -8,6 +8,20 @@ export const roles=[
  {id:6,name:'정령 소환술사',tag:'정령 · 소환',desc:'공책의 작은 여우를 동료로 불러요.',color:'#348f91',icon:'✺',skill:'별여우 소환',hp:90,mp:36,atk:13,cost:12,power:24,effect:'summon'},
  {id:7,name:'흑마법사',tag:'어둠 · 흡수',desc:'적의 잉크에서 생명력을 되찾아요.',color:'#8950a0',icon:'☾',skill:'영혼 흡수',hp:85,mp:36,atk:16,cost:10,power:44,effect:'drain'}
 ];
+// Skill definitions are authoritative; saves continue to store only combat progress.
+export const skillSets=roles.map(h=>[{name:h.skill,cost:h.cost,power:h.power,effect:h.effect,...(h.heal?{heal:h.heal}:{}),...(h.effect==='protect'?{guard:'party'}:{}),...(h.effect==='summon'?{summon:true}:{}),...(h.effect==='drain'?{drain:true}:{})}]);
+const extraSkills=[
+ [{name:'불꽃 회오리',cost:12,power:26,effect:'fire',area:true},{name:'불굴의 검',cost:6,power:24,effect:'fire',guard:'self'}],
+ [{name:'유성우',cost:15,power:30,effect:'magic',area:true},{name:'별빛 집중포',cost:18,power:70,effect:'magic'}],
+ [{name:'화살비',cost:12,power:24,effect:'arrow',area:true},{name:'바람 저격',cost:14,power:62,effect:'arrow'}],
+ [{name:'여명의 결계',cost:12,power:0,heal:12,effect:'heal',guard:'party'},{name:'태양 관통',cost:14,power:55,effect:'protect'}],
+ [{name:'만개하는 기적',cost:18,power:0,heal:45,effect:'heal'},{name:'장미 가시',cost:8,power:38,effect:'magic'}],
+ [{name:'그림자 난무',cost:14,power:28,effect:'rogue',area:true},{name:'생명 훔치기',cost:8,power:36,effect:'drain',drain:true}],
+ [{name:'정령 쇄도',cost:16,power:40,effect:'summon',summon:true},{name:'정령 결계',cost:12,power:0,heal:18,effect:'heal',guard:'party'}],
+ [{name:'영혼 소용돌이',cost:16,power:26,effect:'drain',area:true,drain:true},{name:'심연의 창',cost:20,power:72,effect:'drain'}]
+];
+skillSets.forEach((list,id)=>list.push(...extraSkills[id]));
+export function skillsFor(hero){return skillSets[hero.id];}
 export function validParty(ids){return Array.isArray(ids)&&ids.length===4&&new Set(ids).size===4&&ids.every(id=>Number.isInteger(id)&&roles[id]);}
 export const enemyDefinitions=[
  {id:0,name:'잉크의 왕',kind:'boss',hp:420,maxHp:420},
@@ -21,29 +35,30 @@ export function createBattle(ids=[0,1,2,3]){
 }
 function finishVictory(state){if(state.enemies.some(e=>e.hp>0))return false;state.status='victory';state.log.push('모든 적을 물리쳤다! 보상: 별 조각 30개');return true;}
 export function selectTarget(state,target){if(state.status!=='playing'||!Number.isInteger(target)||!state.enemies[target]||state.enemies[target].hp<=0)return false;state.target=target;return true;}
-export function act(state,action){
+export function act(state,action,skillIndex=0){
  if(state.status!=='playing'||!['attack','skill','guard'].includes(action))return false;
- const hero=state.party[state.turn];if(!hero||hero.hp<=0||(action==='skill'&&hero.mp<hero.cost))return false;
+ const hero=state.party[state.turn];
+ const ability=action==='skill'&&Number.isInteger(skillIndex)?skillsFor(hero||{})?.[skillIndex]:null;
+ if(!hero||hero.hp<=0||(action==='skill'&&(!ability||hero.mp<ability.cost)))return false;
  if(!state.enemies[state.target]||state.enemies[state.target].hp<=0)state.target=state.enemies.findIndex(e=>e.hp>0);
  if(state.target<0)return false;
- const target=state.target,enemy=state.enemies[target];
- let damage=0,healing=state.party.map(()=>0);hero.guard=false;
+ const target=state.target;
+ const healing=state.party.map(()=>0),damageByTarget=state.enemies.map(()=>0);hero.guard=false;
  if(action==='guard'){hero.guard=true;hero.mp=Math.min(hero.maxMp,hero.mp+5);state.log.push(`${hero.name}: 방어! 다음 반격 피해 감소 · MP +5`);}
- else if(action==='skill'&&hero.effect==='heal'){
-  hero.mp-=hero.cost;state.party.forEach((p,i)=>{if(p.hp>0){healing[i]=Math.min(hero.heal,p.maxHp-p.hp);p.hp+=healing[i];}});
-  state.log.push(`${hero.name}의 장미의 축복! 생존 아군 전체 HP 최대 ${hero.heal} 회복`);
- }else {
-  damage=Math.min(enemy.hp,action==='skill'?hero.power:hero.atk);
-  if(action==='skill'){
-   hero.mp-=hero.cost;
-   if(hero.effect==='protect')state.party.filter(h=>h.hp>0).forEach(h=>h.guard=true);
-   if(hero.effect==='summon'){state.summon={owner:hero.id,rounds:3};state.log.push('별여우가 나타났다! 이번 라운드부터 3회 지원 공격.');}
-   if(hero.effect==='drain'){healing[state.turn]=Math.min(Math.floor(damage/2),hero.maxHp-hero.hp);hero.hp+=healing[state.turn];}
-  }
-  enemy.hp-=damage;state.log.push(`${hero.name}의 ${action==='skill'?hero.skill:'기본 공격'} → ${enemy.name}: ${damage} 피해${hero.effect==='drain'&&action==='skill'?`, HP ${healing[state.turn]} 흡수`:''}`);
-  if(enemy.hp===0)state.log.push(`${enemy.name} 처치!`);
+ else {
+  if(ability)hero.mp-=ability.cost;
+  const power=ability?ability.power:hero.atk;
+  state.enemies.forEach((e,i)=>{if(e.hp>0&&(i===target||ability?.area)){damageByTarget[i]=Math.min(e.hp,power);e.hp-=damageByTarget[i];}});
+  if(ability?.heal)state.party.forEach((p,i)=>{if(p.hp>0){healing[i]=Math.min(ability.heal,p.maxHp-p.hp);p.hp+=healing[i];}});
+  if(ability?.guard==='party')state.party.filter(p=>p.hp>0).forEach(p=>p.guard=true);
+  if(ability?.guard==='self')hero.guard=true;
+  if(ability?.summon){state.summon={owner:hero.id,rounds:3};state.log.push('별여우가 나타났다! 이번 라운드부터 3회 지원 공격.');}
+  if(ability?.drain){healing[state.turn]=Math.min(Math.floor(damageByTarget.reduce((a,b)=>a+b,0)/2),hero.maxHp-hero.hp);hero.hp+=healing[state.turn];}
+  const result=damageByTarget.map((n,i)=>n?`${state.enemies[i].name} ${n} 피해`:null).filter(Boolean).join(' · ');
+  state.log.push(`${hero.name}의 ${ability?.name||'기본 공격'}! ${result}${ability?.heal?`생존 아군 전체 HP 최대 ${ability.heal} 회복`:''}${ability?.drain?` · HP ${healing[state.turn]} 흡수`:''}${ability?.guard?` · ${ability.guard==='party'?'아군 전체':'자신'} 보호`:''}`);
+  damageByTarget.forEach((n,i)=>{if(n>0&&state.enemies[i].hp===0)state.log.push(`${state.enemies[i].name} 처치!`);});
  }
- state.last={actor:state.turn,action,target,damage,healing,enemyHP:state.enemies.map(e=>e.hp),summonAttack:null,enemyStrikes:[],counter:false};
+ state.last={actor:state.turn,action,skillIndex:ability?skillIndex:null,skillName:ability?.name,kind:ability?.effect||hero.effect,area:!!ability?.area,guard:ability?.guard||null,drain:!!ability?.drain,target,damage:damageByTarget[target],damageByTarget,healing,enemyHP:state.enemies.map(e=>e.hp),summonAttack:null,enemyStrikes:[],counter:false};
  if(finishVictory(state))return true;
  let next=state.party.findIndex((h,i)=>i>state.turn&&h.hp>0);
  if(next===-1){
