@@ -1,6 +1,8 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createBattle,act} from './battle.js';
+import {createBattle as createGroup,act,selectTarget} from './battle.js';
+// Keep original boss-only behavior checks independent of the new adds.
+function createBattle(ids){const s=createGroup(ids);s.enemies.slice(1).forEach(e=>e.hp=0);return s;}
 test('four heroes act then enemy counters',()=>{let s=createBattle();for(let i=0;i<4;i++)act(s,'attack');assert.equal(s.round,2);assert.equal(s.turn,0);assert.equal(s.enemy.hp,354);assert.deepEqual(s.party.map(h=>h.hp),[102,62,72,92]);});
 test('skill costs MP; insufficient MP cannot advance',()=>{let s=createBattle();act(s,'skill');assert.equal(s.party[0].mp,16);assert.equal(s.enemy.hp,378);s.party[1].mp=0;assert.equal(act(s,'skill'),false);assert.equal(s.turn,1);});
 test('guard recovers MP and reduces incoming damage',()=>{let s=createBattle();s.party[0].mp=0;act(s,'guard');for(let i=0;i<3;i++)act(s,'attack');assert.equal(s.party[0].mp,5);assert.equal(s.party[0].hp,113);});
@@ -11,3 +13,10 @@ test('every third counter is heavy; reset creates fresh state',()=>{let s=create
 test('custom parties preserve chosen order; invalid selections rejected',()=>{assert.deepEqual(createBattle([5,4,3,1]).party.map(p=>p.id),[5,4,3,1]);for(const ids of [[0,0,1,2],[0,1,2],[0,1,2,8]])assert.throws(()=>createBattle(ids));});
 test('protector works in any slot and other fourth-slot skills do not protect',()=>{let s=createBattle([3,0,1,5]);act(s,'skill');assert.ok(s.party.every(p=>p.guard));s=createBattle([0,1,2,5]);s.turn=3;act(s,'skill');assert.equal(s.party[0].hp,102);assert.equal(s.enemy.hp,368);});
 test('healer restores living allies, respects cap and never resurrects',()=>{let s=createBattle([4,0,1,5]);s.party[0].hp-=40;s.party[1].hp-=5;s.party[2].hp=0;act(s,'skill');assert.deepEqual(s.party.map(p=>p.hp),[80,120,0,85]);assert.equal(s.party[0].mp,30);assert.equal(s.enemy.hp,420);assert.deepEqual(s.last.healing,[30,5,0,0]);});
+
+test('three enemies can be independently targeted; all must fall',()=>{const s=createGroup();assert.equal(s.enemies.length,3);selectTarget(s,1);act(s,'skill');assert.equal(s.enemies[1].hp,28);assert.equal(s.enemy.hp,420);s.enemy.hp=1;selectTarget(s,0);act(s,'attack');assert.equal(s.enemy.hp,0);assert.equal(s.status,'playing');assert.equal(s.target,1);assert.equal(selectTarget(s,0),false);assert.equal(selectTarget(s,99),false);});
+test('living adds attack, dead boss and adds cannot retaliate',()=>{const s=createGroup();s.enemy.hp=0;s.enemies[1].hp=0;s.turn=3;act(s,'guard');assert.deepEqual(s.last.enemyStrikes.map(x=>x.enemy),[2]);assert.equal(s.party[1].hp,73);assert.equal(s.round,2);});
+test('summon persists for exactly three support attacks',()=>{const s=createGroup([6,7,0,3]);selectTarget(s,1);act(s,'skill');assert.equal(s.summon.rounds,3);assert.equal(s.enemies[1].hp,46);for(let i=0;i<3;i++)act(s,'guard');assert.equal(s.summon.rounds,2);assert.equal(s.enemies[1].hp,28);for(let i=0;i<8;i++)act(s,'guard');assert.equal(s.summon,null);assert.equal(s.enemies[1].hp,0);});
+test('summon retargets dead victims and can end the battle before retaliation',()=>{const s=createGroup([6,7,0,3]);s.enemy.hp=18;s.enemies[1].hp=1;s.enemies[2].hp=0;s.summon={owner:6,rounds:1};s.turn=3;selectTarget(s,1);act(s,'attack');assert.equal(s.status,'victory');assert.equal(s.last.summonAttack.target,0);assert.equal(s.last.counter,false);assert.equal(s.summon,null);});
+test('drain heals from actual damage, respects cap, and pays MP',()=>{const s=createGroup([7,6,0,3]);s.party[0].hp=40;s.enemies[1].hp=10;selectTarget(s,1);act(s,'skill');assert.equal(s.party[0].hp,45);assert.equal(s.party[0].mp,26);assert.equal(s.last.damage,10);assert.equal(s.last.healing[0],5);});
+test('summon is removed when its owner falls',()=>{const s=createGroup([6,7,0,3]);s.summon={owner:6,rounds:3};s.party[0].hp=1;s.turn=3;act(s,'attack');assert.equal(s.party[0].hp,0);assert.equal(s.summon,null);});

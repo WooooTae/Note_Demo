@@ -1,15 +1,22 @@
 import {actionPose,ACTION_SECONDS} from './animation.js';
 let frame=0,audio;
 const doodleAtlas=new Image();doodleAtlas.src='assets/heroes-doodle.png';
+const summonsAtlas=new Image();summonsAtlas.src='assets/summons-doodle.png';
+const extraBoxes=[[20,75,490,445],[550,65,485,455],[1070,185,455,335],[35,535,475,470],[540,550,480,450]];
 const doodleBoss=new Image();doodleBoss.src='assets/boss-doodle.png';
 const heroBoxes=[[20,45,545,475],[565,35,475,485],[1070,130,460,390],[15,545,600,440],[615,550,425,440],[1075,575,445,410]];
-const heroHeights=[166,174,151,175,166,151];
-const palettes=[['#ed5d20','#ffad26','#fff0ac'],['#268adb','#7be7ff','#f1ffff'],['#4f9846','#a5da57','#f1ffc6'],['#dca32a','#ffe177','#fffbe0'],['#ce7198','#f5b7cc','#fff1f6'],['#7240a5','#c396ff','#f4e9ff']];
+const heroHeights=[166,174,151,175,166,151,166,166];
+const palettes=[['#ed5d20','#ffad26','#fff0ac'],['#268adb','#7be7ff','#f1ffff'],['#4f9846','#a5da57','#f1ffc6'],['#dca32a','#ffe177','#fffbe0'],['#ce7198','#f5b7cc','#fff1f6'],['#7240a5','#c396ff','#f4e9ff'],['#218f92','#79e7dc','#f2ffff'],['#843caf','#d28bff','#f9e6ff']];
 const limit=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
 const ease=v=>1-Math.pow(1-limit(v),3);
 export function paintPortraits(){
- const draw=()=>document.querySelectorAll('.hero-portrait').forEach(canvas=>{if(!doodleAtlas.naturalWidth)return;const id=Number(canvas.dataset.hero),[sx,sy,sw,sh]=heroBoxes[id];canvas.width=220;canvas.height=270;const c=canvas.getContext('2d'),scale=Math.min(212/sw,244/sh);c.clearRect(0,0,220,270);if(id===3){const xx=(220-sw*scale)/2,yy=264-sh*scale;c.beginPath();[[0,0],[600,0],[600,145],[475,195],[475,440],[0,440]].forEach(([a,b],j)=>j?c.lineTo(xx+a*scale,yy+b*scale):c.moveTo(xx+a*scale,yy+b*scale));c.closePath();c.clip();}c.drawImage(doodleAtlas,sx,sy,sw,sh,(220-sw*scale)/2,264-sh*scale,sw*scale,sh*scale);});
- if(doodleAtlas.naturalWidth)draw();else doodleAtlas.addEventListener('load',draw,{once:true});
+ const draw=()=>document.querySelectorAll('.hero-portrait').forEach(canvas=>{
+  const id=Number(canvas.dataset.hero),atlas=id<6?doodleAtlas:summonsAtlas;if(!atlas.naturalWidth)return;
+  const [sx,sy,sw,sh]=id<6?heroBoxes[id]:extraBoxes[id-6];canvas.width=220;canvas.height=270;const c=canvas.getContext('2d'),scale=Math.min(212/sw,244/sh);c.clearRect(0,0,220,270);
+  if(id===3){const xx=(220-sw*scale)/2,yy=264-sh*scale;c.beginPath();[[0,0],[600,0],[600,145],[475,195],[475,440],[0,440]].forEach(([a,b],j)=>j?c.lineTo(xx+a*scale,yy+b*scale):c.moveTo(xx+a*scale,yy+b*scale));c.closePath();c.clip();}
+  c.drawImage(atlas,sx,sy,sw,sh,(220-sw*scale)/2,264-sh*scale,sw*scale,sh*scale);
+ });
+ draw();for(const atlas of [doodleAtlas,summonsAtlas])if(!atlas.complete)atlas.addEventListener('load',draw,{once:true});
 }
 export function sound(kind,enabled){
  if(!enabled)return;try{audio??=new(window.AudioContext||window.webkitAudioContext)();audio.resume();const now=audio.currentTime;
@@ -51,8 +58,8 @@ function createBackdrop(){
 }
 let backdrop;
 function drawDoodle(c,id,x,y,time,pose={},alpha=1){
- if(!doodleAtlas.naturalWidth)return;
- const [sx,sy,sw,sh]=heroBoxes[id],h=heroHeights[id],scale=h/sh;
+ const atlas=id<6?doodleAtlas:summonsAtlas;if(!atlas.naturalWidth)return;
+ const [sx,sy,sw,sh]=(id<6?heroBoxes[id]:extraBoxes[id-6]),h=heroHeights[id],scale=h/sh;
  const bob=pose.still?0:Math.sin(time*3.3+id)*1.7;
  c.save();c.globalAlpha*=alpha;c.translate(x,y+bob);
  if(pose.dead){c.globalAlpha*=.27;c.rotate(-1.15);}
@@ -62,8 +69,13 @@ function drawDoodle(c,id,x,y,time,pose={},alpha=1){
  const strips=24,bend=(pose.bend||0)+(pose.still?0:Math.sin(time*2.2+id)*1.3);
  const w=sw*scale;
  if(id===3){c.beginPath();[[0,0],[600,0],[600,145],[475,195],[475,440],[0,440]].forEach(([a,b],j)=>j?c.lineTo(-w/2+a*scale,-h+b*scale):c.moveTo(-w/2+a*scale,-h+b*scale));c.closePath();c.clip();}
- for(let j=0;j<strips;j++){const v=j/strips,sourceH=Math.min(sh-j*sh/strips,sh/strips+.6),shift=bend*Math.pow(1-v,1.6);c.drawImage(doodleAtlas,sx,sy+j*sh/strips,sw,sourceH,-w/2+shift,-h+j*h/strips,w,sourceH*scale+.2);}
+ for(let j=0;j<strips;j++){const v=j/strips,sourceH=Math.min(sh-j*sh/strips,sh/strips+.6),shift=bend*Math.pow(1-v,1.6);c.drawImage(atlas,sx,sy+j*sh/strips,sw,sourceH,-w/2+shift,-h+j*h/strips,w,sourceH*scale+.2);}
  c.restore();
+}
+function drawExtra(c,index,x,y,height,time,dead=false,rotation=0){
+ if(!summonsAtlas.naturalWidth)return;const [sx,sy,sw,sh]=extraBoxes[index],w=height*sw/sh;c.save();c.translate(x,y);c.rotate(rotation);if(dead)c.globalAlpha=.18;
+ if(index===2&&!dead)c.scale(1+Math.sin(time*3)*.035,1-Math.sin(time*3)*.045);
+ oval(c,0,4,w*.3,5,'#44364c22');c.drawImage(summonsAtlas,sx,sy,sw,sh,-w/2,-height,w,height);c.restore();
 }
 function drawInkKing(c,x,y,time,recoil=0,swing=0,dead=false,still=false){
  if(!doodleBoss.naturalWidth)return;
@@ -92,9 +104,10 @@ function slash(c,x,y,progress,palette,rotation=-.65,size=1,alpha=1){
  for(let k=0;k<14;k++){const a=start+(end-start)*k/14,r=120+(k%3)*9;line(c,[[Math.cos(a)*r,Math.sin(a)*67],[Math.cos(a-.11)*(r+28),Math.sin(a-.11)*84]],palette[k%3],2);}
  c.restore();
 }
-export function mountScene(canvas,state,getEvent){
+export function mountScene(canvas,state,getEvent,onTarget){
  stopScene();backdrop??=createBackdrop();const c=canvas.getContext('2d'),W=1100,H=500,reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
- const positions=[[110,385],[270,357],[425,385],[570,357]],bossPoint=[857,373];
+ const positions=[[110,385],[270,357],[425,385],[570,357]],enemyPositions=[[865,350],[730,421],[1010,420]];
+ canvas.onclick=e=>{if(getEvent()||state.status!=='playing')return;const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;for(const id of [1,2,0]){const [ex,ey]=enemyPositions[id],w=id===0?125:72,h=id===0?260:130;if(state.enemies[id].hp>0&&x>ex-w&&x<ex+w&&y>ey-h&&y<ey+20){onTarget?.(id);break;}}};
  let impactSound=false,counterSound=false,lastEvent=null;
  function draw(now){
   if(!canvas.isConnected)return;
@@ -103,21 +116,31 @@ export function mountScene(canvas,state,getEvent){
   c.setTransform(pw/W,0,0,ph/H,0,0);c.clearRect(0,0,W,H);
   const t=now/1000,ev=getEvent(),dt=ev?Math.max(0,(now-ev.start)/1000):0;
   if(ev!==lastEvent){lastEvent=ev;impactSound=false;counterSound=false;}
-  if(ev&&dt>=.6&&!ev.previewed){ev.previewed=true;ev.onImpact?.();}if(ev?.counter&&dt>=ACTION_SECONDS+.39&&!ev.counterPreviewed){ev.counterPreviewed=true;ev.onCounter?.();}
+  if(ev&&dt>=.6&&!ev.previewed){ev.previewed=true;ev.onImpact?.();}if(ev?.summonAttack&&dt>=1.12&&!ev.summonPreviewed){ev.summonPreviewed=true;ev.onSummon?.();}if(ev?.counter&&dt>=ACTION_SECONDS+.39&&!ev.counterPreviewed){ev.counterPreviewed=true;ev.onCounter?.();}
   const pose=ev?actionPose(dt,ev.kind,ev.action):null,heal=ev?.kind==='heal'&&ev.action==='skill',attack=ev&&ev.action!=='guard'&&!heal;
   const age=dt-.60,enemyT=ev?.counter?dt-ACTION_SECONDS:-1,enemyHit=enemyT>=.39&&enemyT<.8;
   const palette=ev?palettes[state.party[ev.actor].id]:palettes[0],skill=ev?.action==='skill';
-  const bx=bossPoint[0],by=bossPoint[1],tx=bx-15,ty=by-120;
+  const target=ev?.target??state.target,[bx,by]=enemyPositions[target],[kingX,kingY]=enemyPositions[0],tx=bx-15,ty=by-(target===0?120:65);
+  const enemyHP=ev?.summonPreviewed?ev.afterSupport:ev?.previewed?ev.afterAction:state.enemies.map(e=>e.hp),bossStrikes=ev?.enemyStrikes.some(hit=>hit.enemy===0);
   c.save();
   if(!reduced){const shake=attack&&age>=0&&age<.22?(1-age/.22)*(skill?5:2):enemyHit?(1-limit((enemyT-.39)/.4))*(ev.heavy?6:3):0;c.translate(Math.sin(now*.09)*shake,Math.cos(now*.12)*shake*.6);}
   c.drawImage(backdrop,0,0);
   // Atmospheric drifting pencil flecks, kept sparse to leave the characters clear.
   if(!reduced)for(let k=0;k<13;k++){const x=(k*93+t*9)%W,y=190+Math.sin(t*.6+k)*55;spark(c,x,y,1.4,'#b7aa8580',k+t*.2);}
-  radiance(c,bx,by-80,150,'#7c55a51a');
+  radiance(c,kingX,kingY-80,150,'#7c55a51a');
   if(skill&&dt<.6){c.save();c.globalAlpha=Math.sin(limit(dt/.6)*Math.PI)*.09;c.fillStyle=palette[0];c.fillRect(0,0,W,H);c.restore();}
-  if(enemyT>=0&&enemyT<.5)ring(c,bx,by-5,60+enemyT*90,'#704393',-t,1);
+  if(bossStrikes&&enemyT>=0&&enemyT<.5)ring(c,kingX,kingY-5,60+enemyT*90,'#704393',-t,1);
   const recoil=attack&&age>=0&&age<.5?Math.sin(age*23)*Math.exp(-age*5):0;
-  drawInkKing(c,bx,by,t,reduced?0:recoil,enemyT>=0?Math.sin(limit(enemyT/.7)*Math.PI):0,state.enemy.hp===0,reduced);
+  drawInkKing(c,kingX,kingY,t,reduced||target!==0?0:recoil,bossStrikes&&enemyT>=0?Math.sin(limit(enemyT/.7)*Math.PI):0,enemyHP[0]===0,reduced);
+  for(const id of [1,2]){let [ex,ey]=enemyPositions[id];const hit=target===id&&attack&&age>=0&&age<.4;const striking=ev?.enemyStrikes.some(h=>h.enemy===id)&&enemyT>=.2&&enemyT<.9;
+   if(striking&&!reduced){const leap=Math.sin(limit((enemyT-.2)/.7)*Math.PI);ex-=leap*32;ey-=leap*16;}
+   if(hit&&!reduced)ex+=Math.sin(age*30)*7;
+   drawExtra(c,id===1?2:3,ex,ey,id===1?95:130,t,enemyHP[id]===0,hit?Math.sin(age*30)*.07:0);
+   letters(c,state.enemies[id].name,ex,ey+18,10,enemyHP[id]?'#67546f':'#a99da4');
+   c.fillStyle='#5e4c6555';c.fillRect(ex-33,ey+23,66,5);c.fillStyle='#ab5967';c.fillRect(ex-33,ey+23,66*enemyHP[id]/state.enemies[id].maxHp,5);
+  }
+  if(state.status==='playing'&&!ev&&enemyHP[state.target]>0){const [ex,ey]=enemyPositions[state.target];oval(c,ex,ey+7,state.target===0?75:46,9,'#bd676416','#b05e68',1.5);letters(c,'▼ 공격 대상',ex,ey-(state.target===0?268:state.target===1?108:143),12,'#a64b5c');}
+
   if(attack&&age>=0&&age<.15){c.save();c.globalAlpha=(1-age/.15)*.35;radiance(c,tx,ty,120,palette[2]);c.restore();}
   const drawn=[];
   const drawOrder=[0,1,2,3].filter(i=>i!==ev?.actor);if(ev)drawOrder.push(ev.actor);
@@ -131,7 +154,7 @@ export function mountScene(canvas,state,getEvent){
     }else if(heal){y-=Math.sin(limit(dt/1.5)*Math.PI)*8;bend=Math.sin(dt*3)*3;}
     else{scaleY=1-Math.sin(limit(dt/1.6)*Math.PI)*.08;bend=-6*Math.sin(limit(dt/1.6)*Math.PI);}
    }
-   if(enemyHit&&hero.hp>0&&!reduced){const r=Math.sin((enemyT-.39)*24)*Math.exp(-(enemyT-.39)*6);x-=r*8;rotation-=r*.1;}
+   if(enemyHit&&hero.hp>0&&ev.damageTaken[i]>0&&!reduced){const r=Math.sin((enemyT-.39)*24)*Math.exp(-(enemyT-.39)*6);x-=r*8;rotation-=r*.1;}
    if(reduced){x=active&&attack?ox+(bx-130-ox)*(pose.reach>.1?.45:0):ox;y=oy;rotation=0;bend=0;scaleX=1;scaleY=1;}
    if(hero.hp>0){oval(c,x,y+5,35,5,'#4f493d18');if(hero.guard)ring(c,x,y,44,'#c6a044',t*.3,.65);}
    if(state.turn===i&&state.status==='playing'){oval(c,x,y+7,41,8,'#8e9a4822','#71854d',1.5);if(!ev)letters(c,'▼',x,y-heroHeights[id]-12,15,'#63794a');}
@@ -139,13 +162,17 @@ export function mountScene(canvas,state,getEvent){
    drawDoodle(c,id,x,y,pose?.hitStop?Math.floor(t*8)/8:t,{bend,rotation,scaleX,scaleY,dead:hero.hp===0,still:reduced});
    if(active&&(ev.action==='guard'||heal||(!attack&&skill))||hero.guard){const color=heal?'#d779a4':'#d6ad49';oval(c,x,y-75,48,87,color+'0e',color+'aa',2);}
    letters(c,hero.name,x,y+30,12,hero.color);drawn.push([x,y]);
-   if(enemyHit&&hero.hp>0){spray(c,x,y-65,(enemyT-.39)*1.8,['#3e2e50','#9770bc','#dfc5ed'],18,.55);letters(c,'−'+ev.damageTaken[i],x,y-155-(enemyT-.39)*50,23,'#70448f');}
+   if(enemyHit&&hero.hp>0&&ev.damageTaken[i]>0){spray(c,x,y-65,(enemyT-.39)*1.8,['#3e2e50','#9770bc','#dfc5ed'],18,.55);letters(c,'−'+ev.damageTaken[i],x,y-155-(enemyT-.39)*50,23,'#70448f');}
   }
+  const summonActive=state.summon||(ev?.kind==='summon'&&ev.action==='skill'&&dt>.55?{owner:6,rounds:3}:null);
+  if(summonActive){const ownerIndex=state.party.findIndex(p=>p.id===summonActive.owner&&p.hp>0);if(ownerIndex>=0){let [fx,fy]=positions[ownerIndex];fx+=48;fy+=9;const support=ev?.summonAttack;if(support&&dt>.93&&dt<1.58){const [ex,ey]=enemyPositions[support.target],p=dt<1.15?ease((dt-.93)/.22):1-ease((dt-1.3)/.28);fx+=(ex-30-fx)*p;fy+=(ey-fy)*p-Math.sin(p*Math.PI)*40;}drawExtra(c,4,fx,fy-(reduced?0:Math.sin(t*4)*3),55,t);if(!ev)letters(c,'정령 '+summonActive.rounds+'회',fx,fy+13,9,'#398e8d');}}
   if(ev){
    const [sx,sy]=positions[ev.actor];
    if(skill&&dt<.58){const charge=ease(dt/.58);ring(c,sx,sy,30+charge*38,palette[0],t,1);radiance(c,sx,sy-75,40+charge*50,palette[0]+'40');for(let k=0;k<9;k++){const a=k*Math.PI*2/9+t*2,r=70*(1-charge*.6);spark(c,sx+Math.cos(a)*r,sy-80+Math.sin(a)*r,2+charge*2,palette[1],a);}}
    if(ev.action==='guard'&&dt<1.4){const p=ease(dt/.4);ring(c,sx,sy,47,palette[0],t*.5,1);c.save();c.globalAlpha=Math.min(1,(1.6-dt)*3);line(c,[[sx,sy-148],[sx+35,sy-130],[sx+28,sy-77],[sx,sy-53],[sx-28,sy-77],[sx-35,sy-130]],'#e7c46c',3,'#ffe8a922',true);line(c,[[sx,sy-136],[sx,sy-68]],'#fff7d6',3);c.restore();letters(c,'GUARD · MP +5',sx,sy-180,16,'#8f7937');}
    if(attack){
+    if(ev.kind==='summon'&&dt>.28&&dt<1.4){const p=ease((dt-.28)/.42),fade=1-limit((dt-.95)/.45);ring(c,sx+45,sy,55,'#35a7a5',-t,fade);radiance(c,sx+45,sy-40,75,'#68e3d65a');if(skill&&dt>.4){const px=sx+50+(tx-sx-50)*p,py=sy-45+(ty-sy+45)*p-Math.sin(p*Math.PI)*65;drawExtra(c,4,px,py,70,t,false,-.13);for(let k=0;k<7;k++)spark(c,px-15-k*12,py-30+Math.sin(k+t)*9,3,'#93f5df',t+k);}else if(!skill){line(c,[[sx,sy-100],[sx+(tx-sx)*p,sy-100+(ty-sy+100)*p]],'#62d5cb',6);}}
+    if(ev.kind==='drain'&&dt>.32&&dt<1.42){const p=ease((dt-.32)/.29),fade=1-limit((dt-.98)/.44);c.save();c.globalAlpha=fade;c.beginPath();c.moveTo(sx+35,sy-105);c.bezierCurveTo(sx+130,sy-170,tx-110,ty-100,tx,ty);c.strokeStyle='#59306b';c.lineWidth=skill?12:5;c.stroke();c.strokeStyle='#cf81f0';c.lineWidth=skill?4:2;c.stroke();if(p===1){ring(c,tx,ty+30,65,'#a859cd',t,1);for(let k=0;k<7;k++){const q=((dt-.6)*1.8+k/7)%1;if(q<0)continue;const px=tx+(sx+20-tx)*q,py=ty+(sy-90-ty)*q-Math.sin(q*Math.PI)*55;oval(c,px,py,4,6,'#d4a5ef','#85439d',1);}if(skill){radiance(c,sx,sy-70,70,'#d09bea44');letters(c,ev.healing[ev.actor]?'+'+ev.healing[ev.actor]:'HP MAX',sx,sy-185,20,'#8850a6');}}c.restore();}
     if(ev.kind==='fire'&&dt>.45&&dt<1.32){const p=ease((dt-.45)/.35),fade=1-limit((dt-.92)/.4);slash(c,tx,ty,p,skill?['#e95a19','#ffb52e','#fff4b5']:['#a5afb7','#dee7eb','#fffdf5'],-.75,skill?1.15:.8,fade);if(skill){for(let k=0;k<13;k++){const a=-2.8+k*.3,r=130+(k%3)*12;const fx=tx+Math.cos(a)*r,fy=ty+Math.sin(a)*90;c.save();c.globalAlpha=fade;line(c,[[fx,fy],[fx+Math.cos(a)*15,fy-28-(k%4)*6],[fx+10,fy-6],[fx+22,fy-17],[fx+11,fy+8]],null,0,k%2?'#ffb83e':'#f06b20',true);c.restore();}}}
     if((ev.kind==='magic'||ev.kind==='heal')&&dt>.3&&dt<1.25){
      const p=ease((dt-.31)/.31),px=sx+(tx-sx)*p,py=sy-115+(ty-sy+115)*p;const color=ev.kind==='heal'?palettes[4]:palettes[1];
@@ -159,14 +186,16 @@ export function mountScene(canvas,state,getEvent){
     if(age>=0&&age<.16&&!reduced){c.save();c.globalAlpha=(1-age/.16)*.1;c.fillStyle=palette[2];c.fillRect(50,95,W-70,H-135);c.restore();}
    }
    if(heal&&dt>.35&&dt<1.5){for(let i=0;i<4;i++){if(state.party[i].hp<=0)continue;const [x,y]=positions[i],p=limit((dt-.35)/1.15),fade=Math.sin(p*Math.PI);radiance(c,x,y-70,95,'#ee9fc74a');ring(c,x,y,50,'#c979a3',-t,fade);c.save();c.globalAlpha=fade;for(let k=0;k<8;k++){const a=k*2.4;const px=x+Math.sin(a+t)*38,py=y-25-(p*110+k*17)%130;oval(c,px,py,3,7,'#edb1c9','#c06f97',.7);spark(c,px+10,py+15,3,'#fff5c9',a);}c.restore();letters(c,ev.healing[i]?'+'+ev.healing[i]:'HP MAX',x,y-170-ease(p)*15,ev.healing[i]?23:13,'#b8628a');}}
-   if(enemyT>=0&&enemyT<1.2){
-    if(enemyT<.35){letters(c,ev.heavy?'잉크 폭발 준비!':'잉크가 번지고 있다…',bx-15,102,18,'#6e448b');radiance(c,bx,ty,60+enemyT*80,'#8a45b377');}
-    if(enemyT>.27){const p=ease((enemyT-.27)/.65),fade=1-limit((enemyT-.8)/.4),ex=bx-p*640;c.save();c.globalAlpha=fade;
-     for(let k=0;k<3;k++)slash(c,ex,ty+35,p,['#2f2044','#8245bc','#d49cff'],1.1,(ev.heavy?1.7:1.25)+k*.08,.4);
-     for(let k=0;k<24;k++){const xx=ex+Math.sin(k*3.2)*90,yy=ty+Math.cos(k*3.2)*125;oval(c,xx,yy,2+k%4,3+k%3,k%2?'#382442':'#78469b');}
+   if(ev.summonAttack&&dt>=1.12&&dt<1.6){const [ex,ey]=enemyPositions[ev.summonAttack.target];spray(c,ex,ey-60,(dt-1.12)*2,['#269e9e','#95ffdf','#edfffa'],22,.65);letters(c,'정령 −'+ev.summonAttack.damage,ex,ey-130-(dt-1.12)*25,18,'#288f8e');}
+   if(bossStrikes&&enemyT>=0&&enemyT<1.2){
+    if(enemyT<.35){letters(c,ev.heavy?'잉크 폭발 준비!':'잉크가 번지고 있다…',kingX-15,102,18,'#6e448b');radiance(c,kingX,kingY-120,60+enemyT*80,'#8a45b377');}
+    if(enemyT>.27){const p=ease((enemyT-.27)/.65),fade=1-limit((enemyT-.8)/.4),ex=kingX-p*640;c.save();c.globalAlpha=fade;
+     for(let k=0;k<3;k++)slash(c,ex,kingY-85,p,['#2f2044','#8245bc','#d49cff'],1.1,(ev.heavy?1.7:1.25)+k*.08,.4);
+     for(let k=0;k<24;k++){const xx=ex+Math.sin(k*3.2)*90,yy=kingY-120+Math.cos(k*3.2)*125;oval(c,xx,yy,2+k%4,3+k%3,k%2?'#382442':'#78469b');}
      c.restore();if(enemyHit)letters(c,ev.heavy?'잉크 폭발!':'잉크 파동!',550,115,27,'#6d3c8c');}
    }
    if(skill&&dt<.58){c.save();c.globalAlpha=Math.min(1,dt/.12)*Math.min(1,(.58-dt)/.12);line(c,[[385,90],[710,90]],'#eee7d3',34);letters(c,state.party[ev.actor].skill,548,97,21,palette[0]);c.restore();}
+   if(enemyHit&&!bossStrikes)letters(c,'몬스터 반격!',550,115,23,'#735087');
    if(attack&&age>=0&&!impactSound){impactSound=true;sound('hit',ev.sound);}
    if(enemyHit&&!counterSound){counterSound=true;sound('hit',ev.sound);}
   }
