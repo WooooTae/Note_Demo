@@ -1,0 +1,10 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {createBattle,act} from './battle.js';
+test('four heroes act then enemy counters',()=>{let s=createBattle();for(let i=0;i<4;i++)act(s,'attack');assert.equal(s.round,2);assert.equal(s.turn,0);assert.equal(s.enemy.hp,354);assert.deepEqual(s.party.map(h=>h.hp),[102,62,72,92]);});
+test('skill costs MP; insufficient MP cannot advance',()=>{let s=createBattle();act(s,'skill');assert.equal(s.party[0].mp,16);assert.equal(s.enemy.hp,378);s.party[1].mp=0;assert.equal(act(s,'skill'),false);assert.equal(s.turn,1);});
+test('guard recovers MP and reduces incoming damage',()=>{let s=createBattle();s.party[0].mp=0;act(s,'guard');for(let i=0;i<3;i++)act(s,'attack');assert.equal(s.party[0].mp,5);assert.equal(s.party[0].hp,113);});
+test('spear skill protects living allies',()=>{let s=createBattle();for(let i=0;i<3;i++)act(s,'attack');act(s,'skill');assert.deepEqual(s.party.map(h=>h.hp),[113,73,83,103]);});
+test('skill strategy wins and terminal state is immutable',()=>{let s=createBattle();for(let i=0;i<100&&s.status==='playing';i++){const h=s.party[s.turn];act(s,h.mp>=h.cost?'skill':'attack');}assert.equal(s.status,'victory');const before=JSON.stringify(s);assert.equal(act(s,'attack'),false);assert.equal(JSON.stringify(s),before);});
+test('defeat and dead hero skip',()=>{let s=createBattle();s.party[1].hp=0;act(s,'attack');assert.equal(s.turn,2);s.party.forEach(h=>h.hp=1);s.turn=3;act(s,'attack');assert.equal(s.status,'defeat');});
+test('every third counter is heavy; reset creates fresh state',()=>{let s=createBattle();s.round=3;s.turn=3;act(s,'attack');assert.equal(s.party[0].hp,90);assert.equal(createBattle().party[0].hp,120);});
