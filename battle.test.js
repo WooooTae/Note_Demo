@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createBattle as createGroup,act,selectTarget} from './battle.js';
+import {createBattle as createAnyBattle,act,selectTarget} from './battle.js';
+const createGroup=(ids)=>createAnyBattle(ids,-1);
 // Keep original boss-only behavior checks independent of the new adds.
 function createBattle(ids){const s=createGroup(ids);s.enemies.slice(1).forEach(e=>e.hp=0);return s;}
 test('four heroes act then enemy counters',()=>{let s=createBattle();for(let i=0;i<4;i++)act(s,'attack');assert.equal(s.round,2);assert.equal(s.turn,0);assert.equal(s.enemy.hp,354);assert.deepEqual(s.party.map(h=>h.hp),[102,62,72,92]);});

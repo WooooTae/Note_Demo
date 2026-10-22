@@ -106,8 +106,9 @@ function slash(c,x,y,progress,palette,rotation=-.65,size=1,alpha=1){
 }
 export function mountScene(canvas,state,getEvent,onTarget){
  stopScene();backdrop??=createBackdrop();const c=canvas.getContext('2d'),W=1100,H=500,reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+ const leadKind=state.enemy.kind,leadHeight=leadKind==='boss'?260:leadKind==='epic'?210:130;
  const positions=[[110,385],[270,357],[425,385],[570,357]],enemyPositions=[[865,350],[730,421],[1010,420]];
- canvas.onclick=e=>{if(getEvent()||state.status!=='playing')return;const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;for(const id of [1,2,0]){const [ex,ey]=enemyPositions[id],w=id===0?125:72,h=id===0?260:130;if(state.enemies[id].hp>0&&x>ex-w&&x<ex+w&&y>ey-h&&y<ey+20){onTarget?.(id);break;}}};
+ canvas.onclick=e=>{if(getEvent()||state.status!=='playing')return;const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;for(const id of [1,2,0]){const [ex,ey]=enemyPositions[id],w=id===0?125:72,h=id===0?leadHeight:130;if(state.enemies[id].hp>0&&x>ex-w&&x<ex+w&&y>ey-h&&y<ey+20){onTarget?.(id);break;}}};
  let impactSound=false,counterSound=false,lastEvent=null;
  function draw(now){
   if(!canvas.isConnected)return;
@@ -120,8 +121,8 @@ export function mountScene(canvas,state,getEvent,onTarget){
   const pose=ev?actionPose(dt,ev.kind,ev.action):null,heal=ev?.kind==='heal'&&ev.action==='skill',attack=ev&&ev.action!=='guard'&&!heal;
   const age=dt-.60,enemyT=ev?.counter?dt-ACTION_SECONDS:-1,enemyHit=enemyT>=.39&&enemyT<.8;
   const palette=ev?palettes[state.party[ev.actor].id]:palettes[0],skill=ev?.action==='skill';
-  const target=ev?.target??state.target,[bx,by]=enemyPositions[target],[kingX,kingY]=enemyPositions[0],tx=bx-15,ty=by-(target===0?120:65);
-  const enemyHP=ev?.summonPreviewed?ev.afterSupport:ev?.previewed?ev.afterAction:state.enemies.map(e=>e.hp),bossStrikes=ev?.enemyStrikes.some(hit=>hit.enemy===0);
+  const target=ev?.target??state.target,[bx,by]=enemyPositions[target],[kingX,kingY]=enemyPositions[0],tx=bx-15,ty=by-(target===0?leadHeight*.46:65);
+  const enemyHP=ev?.summonPreviewed?ev.afterSupport:ev?.previewed?ev.afterAction:state.enemies.map(e=>e.hp),bossStrikes=(leadKind==='boss'||leadKind==='epic')&&ev?.enemyStrikes.some(hit=>hit.enemy===0);
   c.save();
   if(!reduced){const shake=attack&&age>=0&&age<.22?(1-age/.22)*(skill?5:2):enemyHit?(1-limit((enemyT-.39)/.4))*(ev.heavy?6:3):0;c.translate(Math.sin(now*.09)*shake,Math.cos(now*.12)*shake*.6);}
   c.drawImage(backdrop,0,0);
@@ -131,7 +132,14 @@ export function mountScene(canvas,state,getEvent,onTarget){
   if(skill&&dt<.6){c.save();c.globalAlpha=Math.sin(limit(dt/.6)*Math.PI)*.09;c.fillStyle=palette[0];c.fillRect(0,0,W,H);c.restore();}
   if(bossStrikes&&enemyT>=0&&enemyT<.5)ring(c,kingX,kingY-5,60+enemyT*90,'#704393',-t,1);
   const recoil=attack&&age>=0&&age<.5?Math.sin(age*23)*Math.exp(-age*5):0;
-  drawInkKing(c,kingX,kingY,t,reduced||target!==0?0:recoil,bossStrikes&&enemyT>=0?Math.sin(limit(enemyT/.7)*Math.PI):0,enemyHP[0]===0,reduced);
+  if(leadKind==='boss')drawInkKing(c,kingX,kingY,t,reduced||target!==0?0:recoil,bossStrikes&&enemyT>=0?Math.sin(limit(enemyT/.7)*Math.PI):0,enemyHP[0]===0,reduced);
+  else{
+   const striking=ev?.enemyStrikes.some(h=>h.enemy===0)&&enemyT>=.2&&enemyT<.9;
+   const leap=striking&&!reduced?Math.sin(limit((enemyT-.2)/.7)*Math.PI):0;
+   if(leadKind==='epic'){radiance(c,kingX,kingY-90,145,'#a750da44');ring(c,kingX,kingY,75,'#9e61c4',t*.3,.7);for(let k=0;k<5;k++)spark(c,kingX+Math.sin(t+k*1.2)*72,kingY-90+Math.cos(t+k*1.2)*90,4,'#b77adb',t);}
+   drawExtra(c,leadKind==='slime'?2:3,kingX-leap*35+(target===0&&!reduced?recoil*7:0),kingY-leap*20,leadHeight,t,enemyHP[0]===0,0);
+   letters(c,leadKind==='epic'?'✦ EPIC · 해골 대장':'먹물 슬라임',kingX,kingY+22,13,leadKind==='epic'?'#8b4ca8':'#67546f');
+  }
   for(const id of [1,2]){let [ex,ey]=enemyPositions[id];const hit=target===id&&attack&&age>=0&&age<.4;const striking=ev?.enemyStrikes.some(h=>h.enemy===id)&&enemyT>=.2&&enemyT<.9;
    if(striking&&!reduced){const leap=Math.sin(limit((enemyT-.2)/.7)*Math.PI);ex-=leap*32;ey-=leap*16;}
    if(hit&&!reduced)ex+=Math.sin(age*30)*7;
@@ -139,7 +147,7 @@ export function mountScene(canvas,state,getEvent,onTarget){
    letters(c,state.enemies[id].name,ex,ey+18,10,enemyHP[id]?'#67546f':'#a99da4');
    c.fillStyle='#5e4c6555';c.fillRect(ex-33,ey+23,66,5);c.fillStyle='#ab5967';c.fillRect(ex-33,ey+23,66*enemyHP[id]/state.enemies[id].maxHp,5);
   }
-  if(state.status==='playing'&&!ev&&enemyHP[state.target]>0){const [ex,ey]=enemyPositions[state.target];oval(c,ex,ey+7,state.target===0?75:46,9,'#bd676416','#b05e68',1.5);letters(c,'▼ 공격 대상',ex,ey-(state.target===0?268:state.target===1?108:143),12,'#a64b5c');}
+  if(state.status==='playing'&&!ev&&enemyHP[state.target]>0){const [ex,ey]=enemyPositions[state.target];oval(c,ex,ey+7,state.target===0?75:46,9,'#bd676416','#b05e68',1.5);letters(c,'▼ 공격 대상',ex,ey-(state.target===0?leadHeight+10:state.target===1?108:143),12,'#a64b5c');}
 
   if(attack&&age>=0&&age<.15){c.save();c.globalAlpha=(1-age/.15)*.35;radiance(c,tx,ty,120,palette[2]);c.restore();}
   const drawn=[];
@@ -190,11 +198,11 @@ export function mountScene(canvas,state,getEvent,onTarget){
    if(skill&&ev.area&&age>=0&&age<.85){state.enemies.forEach((e,i)=>{if(i===ev.target||!ev.damageByTarget[i])return;const [x,y]=enemyPositions[i],fy=y-70,fade=1-age/.85;ring(c,x,y-10,62,palette[0],t,fade);spray(c,x,fy,age*1.2,palette,36,1);if(ev.kind==='fire'||ev.kind==='rogue')slash(c,x,fy,ease(age/.25),palette,-.6,1,fade);else if(ev.kind==='arrow'){for(let k=0;k<4;k++)line(c,[[x-55+k*22,fy-100+age*80],[x-20+k*22,fy-15+age*80]],palette[1],3);}else{radiance(c,x,fy,90*fade,palette[1]+'66');spark(c,x,fy,40*fade,palette[1],t);}letters(c,'−'+ev.damageByTarget[i],x,fy-70-ease(age/.8)*28,28,palette[0]);});}
    if(ev.summonAttack&&dt>=1.12&&dt<1.6){const [ex,ey]=enemyPositions[ev.summonAttack.target];spray(c,ex,ey-60,(dt-1.12)*2,['#269e9e','#95ffdf','#edfffa'],22,.65);letters(c,'정령 −'+ev.summonAttack.damage,ex,ey-130-(dt-1.12)*25,18,'#288f8e');}
    if(bossStrikes&&enemyT>=0&&enemyT<1.2){
-    if(enemyT<.35){letters(c,ev.heavy?'잉크 폭발 준비!':'잉크가 번지고 있다…',kingX-15,102,18,'#6e448b');radiance(c,kingX,kingY-120,60+enemyT*80,'#8a45b377');}
+    if(enemyT<.35){letters(c,leadKind==='epic'?(ev.heavy?'해골 대장의 강공!':'공허의 파동 준비!'):(ev.heavy?'잉크 폭발 준비!':'잉크가 번지고 있다…'),kingX-15,102,18,'#6e448b');radiance(c,kingX,kingY-120,60+enemyT*80,'#8a45b377');}
     if(enemyT>.27){const p=ease((enemyT-.27)/.65),fade=1-limit((enemyT-.8)/.4),ex=kingX-p*640;c.save();c.globalAlpha=fade;
      for(let k=0;k<3;k++)slash(c,ex,kingY-85,p,['#2f2044','#8245bc','#d49cff'],1.1,(ev.heavy?1.7:1.25)+k*.08,.4);
      for(let k=0;k<24;k++){const xx=ex+Math.sin(k*3.2)*90,yy=kingY-120+Math.cos(k*3.2)*125;oval(c,xx,yy,2+k%4,3+k%3,k%2?'#382442':'#78469b');}
-     c.restore();if(enemyHit)letters(c,ev.heavy?'잉크 폭발!':'잉크 파동!',550,115,27,'#6d3c8c');}
+     c.restore();if(enemyHit)letters(c,leadKind==='epic'?(ev.heavy?'공허 폭발!':'공허 파동!'):(ev.heavy?'잉크 폭발!':'잉크 파동!'),550,115,27,'#6d3c8c');}
    }
    if(skill&&dt<.58){c.save();c.globalAlpha=Math.min(1,dt/.12)*Math.min(1,(.58-dt)/.12);line(c,[[385,90],[710,90]],'#eee7d3',34);letters(c,ev.skillName||state.party[ev.actor].skill,548,97,21,palette[0]);c.restore();}
    if(enemyHit&&!bossStrikes)letters(c,'몬스터 반격!',550,115,23,'#735087');

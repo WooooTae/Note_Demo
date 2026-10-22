@@ -28,12 +28,37 @@ export const enemyDefinitions=[
  {id:1,name:'잉크 슬라임',kind:'slime',hp:70,maxHp:70},
  {id:2,name:'낙서 해골',kind:'skeleton',hp:80,maxHp:80}
 ];
-export function createBattle(ids=[0,1,2,3]){
+const makeEnemy=(id,name,kind,hp,attack,style='single',heavy=attack)=>({id,name,kind,hp,maxHp:hp,attack,style,heavy});
+export const encounters=[
+ {name:'일반 몬스터',subtitle:'숲 입구의 낙서들',enemies:[makeEnemy(0,'먹물 슬라임','slime',80,8),makeEnemy(1,'잉크 슬라임','slime',70,7),makeEnemy(2,'낙서 해골','skeleton',90,9)]},
+ {name:'에픽 몬스터',subtitle:'보랏빛 해골 대장',enemies:[makeEnemy(0,'공허의 해골 대장','epic',260,14,'all',24),makeEnemy(1,'짙은 잉크 슬라임','slime',80,8),makeEnemy(2,'해골 호위병','skeleton',90,10)]},
+ {name:'보스 몬스터',subtitle:'잉크의 왕',enemies:[makeEnemy(0,'잉크의 왕','boss',500,20,'all',34),makeEnemy(1,'왕의 잉크 슬라임','slime',90,9),makeEnemy(2,'왕의 해골 근위병','skeleton',100,11)]}
+];
+export function createBattle(ids=[0,1,2,3],encounter=0){
  if(!validParty(ids))throw new Error('서로 다른 용사 4명을 선택하세요.');
- const enemies=enemyDefinitions.map(e=>({...e}));
- return {party:ids.map(id=>({...roles[id],maxHp:roles[id].hp,maxMp:roles[id].mp,guard:false})),enemies,enemy:enemies[0],target:0,summon:null,turn:0,round:1,status:'playing',log:['잉크의 왕과 부하들이 길을 막았다. 공격할 적을 골라보자.'],last:null};
+ if(!Number.isInteger(encounter)||encounter< -1||encounter>2)throw new Error('잘못된 전투 구간입니다.');
+ const enemies=(encounter===-1?enemyDefinitions:encounters[encounter].enemies).map(e=>({...e}));
+ return {party:ids.map(id=>({...roles[id],maxHp:roles[id].hp,maxMp:roles[id].mp,guard:false})),encounter,enemies,enemy:enemies[0],target:0,summon:null,turn:0,round:1,status:'playing',log:[encounter===-1?'이전 모험을 이어갑니다.':`1스테이지 ${encounter+1}/3 · ${encounters[encounter].name}! 모든 적을 물리치세요.`],last:null};
 }
-function finishVictory(state){if(state.enemies.some(e=>e.hp>0))return false;state.status='victory';state.log.push('모든 적을 물리쳤다! 보상: 별 조각 30개');return true;}
+function finishVictory(state){
+ if(state.enemies.some(e=>e.hp>0))return false;
+ state.status=state.encounter>=0&&state.encounter<2?'cleared':'victory';
+ state.log.push(state.status==='cleared'?'구간 돌파! 잠깐 쉬고 다음 전투로 이동할 수 있습니다.':'1스테이지 클리어! 보상: 별 조각 30개');return true;
+}
+export function advanceEncounter(state){
+ if(state.status!=='cleared'||state.encounter<0||state.encounter>=2||state.enemies.some(e=>e.hp>0))return false;
+ const next=createBattle(state.party.map(p=>p.id),state.encounter+1);
+ next.party.forEach((p,i)=>{const old=state.party[i];p.hp=old.hp>0?Math.min(p.maxHp,old.hp+Math.ceil(p.maxHp*.35)):Math.ceil(p.maxHp*.25);p.mp=Math.min(p.maxMp,old.mp+14);});
+ next.log=[...state.log.slice(-30),'휴식: 생존자 HP 35% 회복 · 쓰러진 동료 HP 25%로 복귀 · MP +14 · 소환 종료',...next.log];
+ Object.assign(state,next);return true;
+}
+export function enemyAttack(state,id){
+ const e=state.enemies[id],heavy=state.round%3===0;
+ const rage=state.encounter===2&&id===0&&e.hp>0&&e.hp<=e.maxHp/2;
+ const damage=state.encounter===-1?(id===0?(heavy?30:18):id===1?5:7):(heavy?e.heavy:e.attack)+(rage?4:0);
+ return {damage,all:state.encounter===-1?id===0:e.style==='all',heavy:heavy&&(state.encounter===-1?id===0:e.heavy>e.attack),rage};
+}
+export function enemyIntent(state){return state.enemies.filter(e=>e.hp>0).map(e=>{const p=enemyAttack(state,e.id);return `${e.name}: ${p.rage?'광폭 ':''}${p.heavy?'강공 ':''}${p.all?'전체':'1명'} ${p.damage}`;}).join(' / ')||'모든 적 처치';}
 export function selectTarget(state,target){if(state.status!=='playing'||!Number.isInteger(target)||!state.enemies[target]||state.enemies[target].hp<=0)return false;state.target=target;return true;}
 export function act(state,action,skillIndex=0){
  if(state.status!=='playing'||!['attack','skill','guard'].includes(action))return false;
@@ -43,7 +68,7 @@ export function act(state,action,skillIndex=0){
  if(!state.enemies[state.target]||state.enemies[state.target].hp<=0)state.target=state.enemies.findIndex(e=>e.hp>0);
  if(state.target<0)return false;
  const target=state.target;
- const healing=state.party.map(()=>0),damageByTarget=state.enemies.map(()=>0);hero.guard=false;
+ const healing=state.party.map(()=>0),damageByTarget=state.enemies.map(()=>0);
  if(action==='guard'){hero.guard=true;hero.mp=Math.min(hero.maxMp,hero.mp+5);state.log.push(`${hero.name}: 방어! 다음 반격 피해 감소 · MP +5`);}
  else {
   if(ability)hero.mp-=ability.cost;
@@ -70,16 +95,14 @@ export function act(state,action,skillIndex=0){
    if(state.summon.rounds===0){state.summon=null;state.log.push('별여우가 공책 속으로 돌아갔다.');}
    if(finishVictory(state))return true;
   }
-  const heavy=state.round%3===0;state.last.counter=true;
-  if(state.enemy.hp>0){
-   state.log.push(heavy?'잉크 폭발! 모든 아군에게 강력한 반격.':'잉크 파동! 모든 아군에게 반격.');
-   state.party.forEach((h,i)=>{if(h.hp>0){const hit=Math.min(h.hp,Math.ceil((heavy?30:18)*(h.guard?0.35:1)));h.hp-=hit;state.last.enemyStrikes.push({enemy:0,target:i,damage:hit});}});
-  }
-  for(let n=1;n<state.enemies.length;n++){
+  state.last.counter=true;
+  for(let n=0;n<state.enemies.length;n++){
    if(state.enemies[n].hp===0)continue;
+   const plan=enemyAttack(state,n);
    const living=state.party.map((p,i)=>({p,i})).filter(({p})=>p.hp>0);if(!living.length)break;
-   const victim=living[(state.round-1+n-1)%living.length],hit=Math.min(victim.p.hp,Math.ceil((n===1?5:7)*(victim.p.guard?0.35:1)));
-   victim.p.hp-=hit;state.last.enemyStrikes.push({enemy:n,target:victim.i,damage:hit});state.log.push(`${state.enemies[n].name}의 공격! ${victim.p.name}에게 ${hit} 피해`);
+   const victims=plan.all?living:[living[(state.round-1+Math.max(0,n-1))%living.length]];
+   state.log.push(`${state.enemies[n].name}: ${plan.rage?'광폭! ':''}${plan.heavy?'강력한 ':''}${plan.all?'전체':'집중'} 공격 (${plan.damage})`);
+   for(const {p,i} of victims){const hit=Math.min(p.hp,Math.ceil(plan.damage*(p.guard?0.35:1)));p.hp-=hit;state.last.enemyStrikes.push({enemy:n,target:i,damage:hit});}
   }
   state.party.forEach(h=>h.guard=false);state.round++;next=state.party.findIndex(h=>h.hp>0);
   if(state.summon&&!state.party.some(p=>p.id===state.summon.owner&&p.hp>0))state.summon=null;
