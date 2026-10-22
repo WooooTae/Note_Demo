@@ -1,3 +1,4 @@
+import {mountPrologue} from './prologue.js';
 import {roles,createBattle,act,validParty,selectTarget} from './battle.js';
 import {mountScene,stopScene,sound,paintPortraits} from './scene.js';
 import {SAVE_KEY,PARTY_KEY,serializeSave,restoreSave} from './save.js';
@@ -11,18 +12,24 @@ function getSave(){return restoreSave(memorySave||readStorage(SAVE_KEY));}
 function saveProgress(){memorySave=serializeSave(state);writeStorage(SAVE_KEY,memorySave);}
 function initialParty(){try{const ids=JSON.parse(readStorage(PARTY_KEY));return validParty(ids)?ids:[0,1,2,3];}catch{return [0,1,2,3];}}
 let selected=initialParty();
+let closePrologue=null;
 function doodle(i){return `<canvas class="doodle hero-portrait" data-hero="${i}" role="img" aria-label="${roles[i].name}"></canvas>`;}
-function cancelScene(){stopScene();clearTimeout(timer);event=null;busy=false;}
+function cancelScene(){if(closePrologue){closePrologue();closePrologue=null;}stopScene();clearTimeout(timer);event=null;busy=false;}
 function home(){
  cancelScene();state=null;document.body.classList.add('title-view');
  const saved=getSave();
  const saveText=saved?`${saved.battle.status==='playing'?'TURN '+String(saved.battle.round).padStart(2,'0'):saved.battle.status==='victory'?'모험 완료':'다시 도전'} · ${new Date(saved.savedAt).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}`:'아직 기록된 모험이 없어요';
- app.innerHTML=`<section class="title-page"><div class="paper-rings" aria-hidden="true">${'<i></i>'.repeat(7)}</div><span class="corner-note">아이가 잠든 밤,<br>공책을 펼쳐보세요.</span><span class="moon-doodle" aria-hidden="true">☾<i>✧</i></span><div class="title-stamp">A LITTLE ADVENTURE IN YOUR NOTEBOOK</div><h1 class="game-title">낙서 <em>용사단</em><span>NOTEBOOK HEROES</span></h1><p class="title-story">지우개가 닿기 전에, 이 세계를 구해줘!</p><div class="title-content"><nav class="game-menu" aria-label="게임 메뉴"><button id="new-game" class="menu-button main-menu"><span>✦</span> 게임 시작 <b>→</b></button><button id="continue" class="menu-button" ${saved?'':'disabled'}><span>↪</span><div>이어하기<small>${saveText}</small></div><b>→</b></button><button id="party-menu" class="menu-button"><span>♧</span> 용사단 편성 <b>8명의 친구들</b></button><p class="menu-help">${storageFailed?'저장 공간을 사용할 수 없어 창을 닫으면 기록이 사라질 수 있어요.':'같은 브라우저와 파일에서 모험을 이어갈 수 있어요.'}</p></nav><aside class="party-polaroid"><span class="tape"></span><div class="polaroid-heading"><span>오늘 밤의 용사단</span><small>04 FRIENDS</small></div><div class="title-party">${selected.map(i=>`<div>${doodle(i)}<small style="color:${roles[i].color}">${roles[i].name}</small></div>`).join('')}</div><p>“한 페이지씩, 함께 지켜 나가자.”</p><button class="change-party" id="change-party">친구 바꾸기 ↗</button></aside></div><div class="page-bottom"><span>CHAPTER 01 <b>낙서의 숲</b></span><span>✧ 4인 파티 · 턴제 모험</span><span>PAGE — 01</span></div></section>`;
- document.querySelector('#new-game').onclick=()=>showParty('start');
+ app.innerHTML=`<section class="title-page"><div class="paper-rings" aria-hidden="true">${'<i></i>'.repeat(7)}</div><span class="corner-note">아이가 잠든 밤,<br>공책을 펼쳐보세요.</span><span class="moon-doodle" aria-hidden="true">☾<i>✧</i></span><div class="title-stamp">A LITTLE ADVENTURE IN YOUR NOTEBOOK</div><h1 class="game-title">낙서 <em>용사단</em><span>NOTEBOOK HEROES</span></h1><p class="title-story">지우개가 닿기 전에, 이 세계를 구해줘!</p><div class="title-content"><nav class="game-menu" aria-label="게임 메뉴"><button id="new-game" class="menu-button main-menu"><span>✦</span> 게임 시작 <b>→</b></button><button id="continue" class="menu-button" ${saved?'':'disabled'}><span>↪</span><div>이어하기<small>${saveText}</small></div><b>→</b></button><button id="party-menu" class="menu-button"><span>♧</span> 용사단 편성 <b>8명의 친구들</b></button><button class="change-party" id="replay-intro">☾ 이야기 다시 보기</button><p class="menu-help">${storageFailed?'저장 공간을 사용할 수 없어 창을 닫으면 기록이 사라질 수 있어요.':'같은 브라우저와 파일에서 모험을 이어갈 수 있어요.'}</p></nav><aside class="party-polaroid"><span class="tape"></span><div class="polaroid-heading"><span>오늘 밤의 용사단</span><small>04 FRIENDS</small></div><div class="title-party">${selected.map(i=>`<div>${doodle(i)}<small style="color:${roles[i].color}">${roles[i].name}</small></div>`).join('')}</div><p>“한 페이지씩, 함께 지켜 나가자.”</p><button class="change-party" id="change-party">친구 바꾸기 ↗</button></aside></div><div class="page-bottom"><span>CHAPTER 01 <b>낙서의 숲</b></span><span>✧ 4인 파티 · 턴제 모험</span><span>PAGE — 01</span></div></section>`;
+ document.querySelector('#new-game').onclick=()=>showIntro(()=>showParty('start'));
+ document.querySelector('#replay-intro').onclick=()=>showIntro(home);
  document.querySelector('#party-menu').onclick=()=>showParty('edit');
  document.querySelector('#change-party').onclick=()=>showParty('edit');
  document.querySelector('#continue').onclick=()=>{const record=getSave();if(record){cancelScene();state=record.battle;render();}else home();};
  paintPortraits();
+}
+function showIntro(after){
+ cancelScene();document.body.classList.remove('title-view');
+ closePrologue=mountPrologue(app,selected,()=>{closePrologue=null;after();});
 }
 function showParty(mode='start',notice=''){
  cancelScene();document.body.classList.remove('title-view');
