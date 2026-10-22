@@ -6,7 +6,9 @@ export const roles=[
  {id:4,name:'장미 성직자',tag:'장미 · 회복',desc:'지워진 용기를 다시 피어나게 해요.',color:'#b56c88',icon:'❀',skill:'장미의 축복',hp:90,mp:40,atk:13,cost:10,power:0,heal:30,effect:'heal'},
  {id:5,name:'그림자 도적',tag:'그림자 · 쌍검',desc:'잉크보다 빠르게 스치는 두 개의 칼날.',color:'#806498',icon:'☽',skill:'그림자 쌍검',hp:85,mp:30,atk:22,cost:10,power:52,effect:'rogue'},
  {id:6,name:'정령 소환술사',tag:'정령 · 소환',desc:'공책의 작은 여우를 동료로 불러요.',color:'#348f91',icon:'✺',skill:'별여우 소환',hp:90,mp:36,atk:13,cost:12,power:24,effect:'summon'},
- {id:7,name:'흑마법사',tag:'어둠 · 흡수',desc:'적의 잉크에서 생명력을 되찾아요.',color:'#8950a0',icon:'☾',skill:'영혼 흡수',hp:85,mp:36,atk:16,cost:10,power:44,effect:'drain'}
+ {id:7,name:'흑마법사',tag:'어둠 · 흡수',desc:'적의 잉크에서 생명력을 되찾아요.',color:'#8950a0',icon:'☾',skill:'영혼 흡수',hp:85,mp:36,atk:16,cost:10,power:44,effect:'drain'},
+ {id:8,name:'마검사',tag:'마력 · 검술',desc:'푸른 마력을 검에 담아 전장을 가르는 용사.',color:'#5267bd',icon:'✧',skill:'룬 블레이드',hp:105,mp:30,atk:19,cost:9,power:46,effect:'runeblade'},
+ {id:9,name:'거너',tag:'탄환 · 원거리',desc:'두 자루 잉크총으로 경쾌하게 탄막을 펼쳐요.',color:'#ba7834',icon:'✹',skill:'더블 트리거',hp:85,mp:30,atk:21,cost:9,power:46,effect:'gun'}
 ];
 // Skill definitions are authoritative; saves continue to store only combat progress.
 export const skillSets=roles.map(h=>[{name:h.skill,cost:h.cost,power:h.power,effect:h.effect,...(h.heal?{heal:h.heal}:{}),...(h.effect==='protect'?{guard:'party'}:{}),...(h.effect==='summon'?{summon:true}:{}),...(h.effect==='drain'?{drain:true}:{})}]);
@@ -18,7 +20,9 @@ const extraSkills=[
  [{name:'만개하는 기적',cost:18,power:0,heal:45,effect:'heal'},{name:'장미 가시',cost:8,power:38,effect:'magic'}],
  [{name:'그림자 난무',cost:14,power:28,effect:'rogue',area:true},{name:'생명 훔치기',cost:8,power:36,effect:'drain',drain:true}],
  [{name:'정령 쇄도',cost:16,power:40,effect:'summon',summon:true},{name:'정령 결계',cost:12,power:0,heal:18,effect:'heal',guard:'party'}],
- [{name:'영혼 소용돌이',cost:16,power:26,effect:'drain',area:true,drain:true},{name:'심연의 창',cost:20,power:72,effect:'drain'}]
+ [{name:'영혼 소용돌이',cost:16,power:26,effect:'drain',area:true,drain:true},{name:'심연의 창',cost:20,power:72,effect:'drain'}],
+ [{name:'차원 검기',cost:14,power:29,effect:'runeblade',area:true},{name:'룬의 수호',cost:7,power:27,effect:'runeblade',guard:'self'}],
+ [{name:'탄막 폭풍',cost:14,power:28,effect:'gun',area:true},{name:'마탄 저격',cost:17,power:68,effect:'gun'}]
 ];
 skillSets.forEach((list,id)=>list.push(...extraSkills[id]));
 export function skillsFor(hero){return skillSets[hero.id];}

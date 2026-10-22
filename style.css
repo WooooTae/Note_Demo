@@ -83,3 +83,4 @@
 @media(max-width:650px){.encounter-path{gap:5px}.encounter-step{padding:10px 6px;gap:5px;align-items:flex-start}.encounter-step>b{font-size:14px}.encounter-step span{font-size:10px}.encounter-step small{font-size:8px;line-height:1.6}.stage-rule{font-size:9px}.counter-hint{font-size:9px;padding:8px 10px}.stage-clear{padding:16px}.stage-clear .primary{width:100%;font-size:12px}}
 .sketch-skip{position:absolute;right:16px;bottom:42px;z-index:3;background:#fff8e6e8;font-size:11px;box-shadow:2px 3px 0 #b4a78b55}
 @media(max-width:650px){.sketch-skip{right:8px;bottom:32px;font-size:9px;padding:6px 8px}}
+@media(min-width:1100px){.roster-grid{grid-template-columns:repeat(5,minmax(0,1fr))}}

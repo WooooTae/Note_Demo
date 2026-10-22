@@ -2,21 +2,25 @@ import {actionPose,ACTION_SECONDS,SKETCH_SECONDS,SKETCH_STAGGER,ENTRANCE_SECONDS
 let frame=0,audio;
 const doodleAtlas=new Image();doodleAtlas.src='assets/heroes-doodle.png';
 const summonsAtlas=new Image();summonsAtlas.src='assets/summons-doodle.png';
+const duoAtlas=new Image();duoAtlas.src='assets/blade-gunner.png';
+const duoBoxes=[[15,85,835,755],[940,85,825,755]];
+const atlasFor=id=>id<6?doodleAtlas:id<8?summonsAtlas:duoAtlas;
+const boxFor=id=>id<6?heroBoxes[id]:id<8?extraBoxes[id-6]:duoBoxes[id-8];
 const extraBoxes=[[20,75,490,445],[550,65,485,455],[1070,185,455,335],[35,535,475,470],[540,550,480,450]];
 const doodleBoss=new Image();doodleBoss.src='assets/boss-doodle.png';
 const heroBoxes=[[20,45,545,475],[565,35,475,485],[1070,130,460,390],[15,545,600,440],[615,550,425,440],[1075,575,445,410]];
-const heroHeights=[166,174,151,175,166,151,166,166];
-const palettes=[['#ed5d20','#ffad26','#fff0ac'],['#268adb','#7be7ff','#f1ffff'],['#4f9846','#a5da57','#f1ffc6'],['#dca32a','#ffe177','#fffbe0'],['#ce7198','#f5b7cc','#fff1f6'],['#7240a5','#c396ff','#f4e9ff'],['#218f92','#79e7dc','#f2ffff'],['#843caf','#d28bff','#f9e6ff']];
+const heroHeights=[166,174,151,175,166,151,166,166,170,162];
+const palettes=[['#ed5d20','#ffad26','#fff0ac'],['#268adb','#7be7ff','#f1ffff'],['#4f9846','#a5da57','#f1ffc6'],['#dca32a','#ffe177','#fffbe0'],['#ce7198','#f5b7cc','#fff1f6'],['#7240a5','#c396ff','#f4e9ff'],['#218f92','#79e7dc','#f2ffff'],['#843caf','#d28bff','#f9e6ff'],['#4e49be','#69d9ff','#f4f5ff'],['#c57929','#ffd071','#fff7d9']];
 const limit=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
 const ease=v=>1-Math.pow(1-limit(v),3);
 export function paintPortraits(){
  const draw=()=>document.querySelectorAll('.hero-portrait').forEach(canvas=>{
-  const id=Number(canvas.dataset.hero),atlas=id<6?doodleAtlas:summonsAtlas;if(!atlas.naturalWidth)return;
-  const [sx,sy,sw,sh]=id<6?heroBoxes[id]:extraBoxes[id-6];canvas.width=220;canvas.height=270;const c=canvas.getContext('2d'),scale=Math.min(212/sw,244/sh);c.clearRect(0,0,220,270);
+  const id=Number(canvas.dataset.hero),atlas=atlasFor(id);if(!atlas.naturalWidth)return;
+  const [sx,sy,sw,sh]=boxFor(id);canvas.width=220;canvas.height=270;const c=canvas.getContext('2d'),scale=Math.min(212/sw,244/sh);c.clearRect(0,0,220,270);
   if(id===3){const xx=(220-sw*scale)/2,yy=264-sh*scale;c.beginPath();[[0,0],[600,0],[600,145],[475,195],[475,440],[0,440]].forEach(([a,b],j)=>j?c.lineTo(xx+a*scale,yy+b*scale):c.moveTo(xx+a*scale,yy+b*scale));c.closePath();c.clip();}
   c.drawImage(atlas,sx,sy,sw,sh,(220-sw*scale)/2,264-sh*scale,sw*scale,sh*scale);
  });
- draw();for(const atlas of [doodleAtlas,summonsAtlas])if(!atlas.complete)atlas.addEventListener('load',draw,{once:true});
+ draw();for(const atlas of [doodleAtlas,summonsAtlas,duoAtlas])if(!atlas.complete)atlas.addEventListener('load',draw,{once:true});
 }
 export function sound(kind,enabled){
  if(!enabled)return;try{audio??=new(window.AudioContext||window.webkitAudioContext)();audio.resume();const now=audio.currentTime;
@@ -58,8 +62,8 @@ function createBackdrop(){
 }
 let backdrop;
 function drawDoodle(c,id,x,y,time,pose={},alpha=1){
- const atlas=id<6?doodleAtlas:summonsAtlas;if(!atlas.naturalWidth)return;
- const [sx,sy,sw,sh]=(id<6?heroBoxes[id]:extraBoxes[id-6]),h=heroHeights[id],scale=h/sh;
+ const atlas=atlasFor(id);if(!atlas.naturalWidth)return;
+ const [sx,sy,sw,sh]=(boxFor(id)),h=heroHeights[id],scale=h/sh;
  const bob=pose.still?0:Math.sin(time*3.3+id)*1.7;
  c.save();c.globalAlpha*=alpha;c.translate(x,y+bob);
  if(pose.dead){c.globalAlpha*=.27;c.rotate(-1.15);}
@@ -189,7 +193,7 @@ export function mountScene(canvas,state,getEvent,onTarget,entrance=false){
    const active=ev?.actor===i;
    if(active){
     if(attack){x+=(bx-130-ox)*pose.reach;y+=(by-oy)*pose.reach;x-=pose.wind*12;bend=-pose.wind*10+pose.swing*16;rotation=-pose.wind*.12+pose.swing*.12;scaleX=1+pose.wind*.04;scaleY=1-pose.wind*.07;
-     if(!['fire','protect','rogue'].includes(hero.effect)){y-=Math.sin(limit(dt/1.4)*Math.PI)*7;bend=pose.swing*6;rotation=-pose.wind*.07;}
+     if(!['fire','protect','rogue','runeblade'].includes(ev.kind)){y-=Math.sin(limit(dt/1.4)*Math.PI)*7;bend=pose.swing*6;rotation=-pose.wind*.07;}
      if(hero.effect==='rogue')y-=Math.sin(pose.reach*Math.PI)*15;
     }else if(heal){y-=Math.sin(limit(dt/1.5)*Math.PI)*8;bend=Math.sin(dt*3)*3;}
     else{scaleY=1-Math.sin(limit(dt/1.6)*Math.PI)*.08;bend=-6*Math.sin(limit(dt/1.6)*Math.PI);}
@@ -214,6 +218,8 @@ export function mountScene(canvas,state,getEvent,onTarget,entrance=false){
    if(attack){
     if(ev.kind==='summon'&&dt>.28&&dt<1.4){const p=ease((dt-.28)/.42),fade=1-limit((dt-.95)/.45);ring(c,sx+45,sy,55,'#35a7a5',-t,fade);radiance(c,sx+45,sy-40,75,'#68e3d65a');if(skill&&dt>.4){const px=sx+50+(tx-sx-50)*p,py=sy-45+(ty-sy+45)*p-Math.sin(p*Math.PI)*65;drawExtra(c,4,px,py,70,t,false,-.13);for(let k=0;k<7;k++)spark(c,px-15-k*12,py-30+Math.sin(k+t)*9,3,'#93f5df',t+k);}else if(!skill){line(c,[[sx,sy-100],[sx+(tx-sx)*p,sy-100+(ty-sy+100)*p]],'#62d5cb',6);}}
     if(ev.kind==='drain'&&dt>.32&&dt<1.42){const p=ease((dt-.32)/.29),fade=1-limit((dt-.98)/.44);c.save();c.globalAlpha=fade;c.beginPath();c.moveTo(sx+35,sy-105);c.bezierCurveTo(sx+130,sy-170,tx-110,ty-100,tx,ty);c.strokeStyle='#59306b';c.lineWidth=skill?12:5;c.stroke();c.strokeStyle='#cf81f0';c.lineWidth=skill?4:2;c.stroke();if(p===1){ring(c,tx,ty+30,65,'#a859cd',t,1);for(let k=0;k<7;k++){const q=((dt-.6)*1.8+k/7)%1;if(q<0)continue;const px=tx+(sx+20-tx)*q,py=ty+(sy-90-ty)*q-Math.sin(q*Math.PI)*55;oval(c,px,py,4,6,'#d4a5ef','#85439d',1);}if(skill&&ev.drain){radiance(c,sx,sy-70,70,'#d09bea44');letters(c,ev.healing[ev.actor]?'+'+ev.healing[ev.actor]:'HP MAX',sx,sy-185,20,'#8850a6');}}c.restore();}
+    if(ev.kind==='runeblade'&&dt>.38&&dt<1.4){const p=ease((dt-.38)/.32),fade=1-limit((dt-.96)/.44);ring(c,tx,ty+35,70,'#7563c9',t,fade);slash(c,tx,ty,p,skill?palette:['#9bafbd','#dce8f0','#ffffff'],-.65,skill?1.1:.75,fade);if(skill){for(let k=0;k<6;k++){const a=k*Math.PI/3+t; spark(c,tx+Math.cos(a)*78,ty+Math.sin(a)*64,8*fade,'#8bdfff',a);}line(c,[[tx-75,ty+60],[tx+65*p,ty-80]],'#d4f7ff',3);}}
+    if(ev.kind==='gun'&&dt>.30&&dt<1.4){const count=skill?(ev.skillName==='마탄 저격'?1:4):2;for(let k=0;k<count;k++){const q=limit((dt-.32-k*.065)/.26),px=sx+48+(tx-sx-48)*q,py=sy-105+(ty-sy+105)*q+(k%2?8:-8),fade=1-limit((dt-.83-k*.04)/.35);c.save();c.globalAlpha=fade;line(c,[[px-70,py],[px,py]],'#ed9a3c66',skill?9:5);line(c,[[px-28,py],[px,py]],'#fff0af',3);oval(c,px,py,skill&&count===1?11:5,3,'#ffc65e','#8a581f',1);if(q<1)spark(c,sx+48,sy-105,18,'#ffcc69',t+k);c.restore();}if(skill&&age>=0&&age<.6){ring(c,tx,ty,42,palette[0],0,1-age/.6);line(c,[[tx-60,ty],[tx+60,ty]],palette[0],1.5);line(c,[[tx,ty-60],[tx,ty+60]],palette[0],1.5);}}
     if(ev.kind==='fire'&&dt>.45&&dt<1.32){const p=ease((dt-.45)/.35),fade=1-limit((dt-.92)/.4);slash(c,tx,ty,p,skill?['#e95a19','#ffb52e','#fff4b5']:['#a5afb7','#dee7eb','#fffdf5'],-.75,skill?1.15:.8,fade);if(skill){for(let k=0;k<13;k++){const a=-2.8+k*.3,r=130+(k%3)*12;const fx=tx+Math.cos(a)*r,fy=ty+Math.sin(a)*90;c.save();c.globalAlpha=fade;line(c,[[fx,fy],[fx+Math.cos(a)*15,fy-28-(k%4)*6],[fx+10,fy-6],[fx+22,fy-17],[fx+11,fy+8]],null,0,k%2?'#ffb83e':'#f06b20',true);c.restore();}}}
     if((ev.kind==='magic'||ev.kind==='heal')&&dt>.3&&dt<1.25){
      const p=ease((dt-.31)/.31),px=sx+(tx-sx)*p,py=sy-115+(ty-sy+115)*p;const color=ev.kind==='heal'?palettes[4]:palettes[1];
@@ -228,7 +234,7 @@ export function mountScene(canvas,state,getEvent,onTarget,entrance=false){
    }
    if(heal&&dt>.35&&dt<1.5){for(let i=0;i<4;i++){if(state.party[i].hp<=0)continue;const [x,y]=positions[i],p=limit((dt-.35)/1.15),fade=Math.sin(p*Math.PI);radiance(c,x,y-70,95,'#ee9fc74a');ring(c,x,y,50,'#c979a3',-t,fade);c.save();c.globalAlpha=fade;for(let k=0;k<8;k++){const a=k*2.4;const px=x+Math.sin(a+t)*38,py=y-25-(p*110+k*17)%130;oval(c,px,py,3,7,'#edb1c9','#c06f97',.7);spark(c,px+10,py+15,3,'#fff5c9',a);}c.restore();letters(c,ev.healing[i]?'+'+ev.healing[i]:'HP MAX',x,y-170-ease(p)*15,ev.healing[i]?23:13,'#b8628a');}}
    if(skill&&ev.guard&&age>=0&&age<.85){positions.forEach(([x,y],i)=>{if(state.party[i].hp<=0||(ev.guard==='self'&&i!==ev.actor))return;ring(c,x,y,50,palette[0],t,1-age/.85);oval(c,x,y-75,48,86,palette[1]+'11',palette[1]+'aa',2);});}
-   if(skill&&ev.area&&age>=0&&age<.85){state.enemies.forEach((e,i)=>{if(i===ev.target||!ev.damageByTarget[i])return;const [x,y]=enemyPositions[i],fy=y-70,fade=1-age/.85;ring(c,x,y-10,62,palette[0],t,fade);spray(c,x,fy,age*1.2,palette,36,1);if(ev.kind==='fire'||ev.kind==='rogue')slash(c,x,fy,ease(age/.25),palette,-.6,1,fade);else if(ev.kind==='arrow'){for(let k=0;k<4;k++)line(c,[[x-55+k*22,fy-100+age*80],[x-20+k*22,fy-15+age*80]],palette[1],3);}else{radiance(c,x,fy,90*fade,palette[1]+'66');spark(c,x,fy,40*fade,palette[1],t);}letters(c,'−'+ev.damageByTarget[i],x,fy-70-ease(age/.8)*28,28,palette[0]);});}
+   if(skill&&ev.area&&age>=0&&age<.85){state.enemies.forEach((e,i)=>{if(i===ev.target||!ev.damageByTarget[i])return;const [x,y]=enemyPositions[i],fy=y-70,fade=1-age/.85;ring(c,x,y-10,62,palette[0],t,fade);spray(c,x,fy,age*1.2,palette,36,1);if(ev.kind==='fire'||ev.kind==='rogue'||ev.kind==='runeblade')slash(c,x,fy,ease(age/.25),palette,-.6,1,fade);else if(ev.kind==='arrow'||ev.kind==='gun'){for(let k=0;k<4;k++)line(c,[[x-55+k*22,fy-100+age*80],[x-20+k*22,fy-15+age*80]],palette[1],3);}else{radiance(c,x,fy,90*fade,palette[1]+'66');spark(c,x,fy,40*fade,palette[1],t);}letters(c,'−'+ev.damageByTarget[i],x,fy-70-ease(age/.8)*28,28,palette[0]);});}
    if(ev.summonAttack&&dt>=1.12&&dt<1.6){const [ex,ey]=enemyPositions[ev.summonAttack.target];spray(c,ex,ey-60,(dt-1.12)*2,['#269e9e','#95ffdf','#edfffa'],22,.65);letters(c,'정령 −'+ev.summonAttack.damage,ex,ey-130-(dt-1.12)*25,18,'#288f8e');}
    if(bossStrikes&&enemyT>=0&&enemyT<1.2){
     if(enemyT<.35){letters(c,leadKind==='epic'?(ev.heavy?'해골 대장의 강공!':'공허의 파동 준비!'):(ev.heavy?'잉크 폭발 준비!':'잉크가 번지고 있다…'),kingX-15,102,18,'#6e448b');radiance(c,kingX,kingY-120,60+enemyT*80,'#8a45b377');}
