@@ -81,6 +81,8 @@
 
 .encounter-path{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:6px 0 12px}.encounter-step{display:flex;align-items:center;gap:12px;padding:15px;border:1px dashed #c8c0ac;border-radius:5px;background:#eee9dd;color:#979080}.encounter-step>b{font-size:21px}.encounter-step span{font-size:13px;font-weight:700}.encounter-step small{display:block;font-size:10px;font-weight:400;margin-top:5px}.encounter-step.current{background:#fff3d4;border:2px solid #b2944f;color:#69542e;box-shadow:2px 3px 0 #d9cba8}.encounter-step.complete{background:#edf0df;border-color:#839466;color:#5c7041}.stage-rule,.legacy-note{font-size:11px;line-height:1.8;color:#817563;margin:8px 0 12px}.counter-hint{padding:12px 15px;border-left:3px solid #a35f71;background:#f3e8e5;color:#864f62;font-size:11px;line-height:1.8;word-break:keep-all}.stage-clear{background:#eef0df;border:1px solid #b1bd94;border-radius:6px;padding:22px;margin-top:20px}.stage-clear p{line-height:1.9}.stage-clear .primary{margin-top:8px}
 @media(max-width:650px){.encounter-path{gap:5px}.encounter-step{padding:10px 6px;gap:5px;align-items:flex-start}.encounter-step>b{font-size:14px}.encounter-step span{font-size:10px}.encounter-step small{font-size:8px;line-height:1.6}.stage-rule{font-size:9px}.counter-hint{font-size:9px;padding:8px 10px}.stage-clear{padding:16px}.stage-clear .primary{width:100%;font-size:12px}}
+.sketch-skip{position:absolute;right:16px;bottom:42px;z-index:3;background:#fff8e6e8;font-size:11px;box-shadow:2px 3px 0 #b4a78b55}
+@media(max-width:650px){.sketch-skip{right:8px;bottom:32px;font-size:9px;padding:6px 8px}}
 </style></head><body><div class="notebook"><header><a class="brand" href="#" id="home-link"><span class="brand-icon">✎</span> 낙서 용사단 <small>NOTEBOOK HEROES</small></a><span class="edition">첫 번째 공책 <b>·</b> PLAYABLE DEMO</span></header><main id="app"></main><footer><span>아이가 잠든 사이, 우리의 모험은 시작된다.</span><span>✧ 손그림으로 만든 작은 세상 &nbsp; / &nbsp; 01</span></footer></div><script>const roles=[
  {id:0,name:'불꽃 기사',tag:'화염 · 근접',desc:'불꽃을 두른 검으로 앞장서는 용사.',color:'#c05c3c',icon:'⚔',skill:'화염 참격',hp:120,mp:24,atk:18,cost:8,power:42,effect:'fire'},
  {id:1,name:'푸른 마법사',tag:'별빛 · 마법',desc:'작은 지팡이에 밤하늘의 힘을 담아요.',color:'#527caa',icon:'✦',skill:'별빛 마법',hp:80,mp:36,atk:12,cost:9,power:48,effect:'magic'},
@@ -230,7 +232,20 @@ function restoreSave(raw){
 // Shared seconds-based timeline: the renderer and turn commit use the same duration.
 const ACTION_SECONDS=1.6;
 const COUNTER_SECONDS=1.25;
-function animationDuration(counter){return (ACTION_SECONDS+(counter?COUNTER_SECONDS:0))*1000;}
+const SKETCH_SECONDS=.65;
+const SKETCH_STAGGER=.45;
+const ENTRANCE_SECONDS=6*SKETCH_STAGGER+SKETCH_SECONDS;
+const ERASE_SECONDS=1.05;
+function removalTimes(before,after){
+ return {
+  enemies:before.enemies.map((e,i)=>e.hp>0&&after.enemies[i].hp===0?(after.last.enemyHP[i]===0?.70:1.20):null),
+  party:before.party.map((p,i)=>p.hp>0&&after.party[i].hp===0?ACTION_SECONDS+.46:null)
+ };
+}
+function animationDuration(counter,removals){
+ const lastRemoval=removals?Math.max(-ERASE_SECONDS,...[...removals.enemies,...removals.party].filter(t=>t!==null)): -ERASE_SECONDS;
+ return Math.max(ACTION_SECONDS+(counter?COUNTER_SECONDS:0),lastRemoval+ERASE_SECONDS+.12)*1000;
+}
 function actionPose(seconds,kind,action='skill'){
  const bounded=(v)=>Math.max(0,Math.min(1,v));
  const smooth=v=>{v=bounded(v);return v*v*(3-2*v);};
@@ -348,17 +363,47 @@ function slash(c,x,y,progress,palette,rotation=-.65,size=1,alpha=1){
  for(let k=0;k<14;k++){const a=start+(end-start)*k/14,r=120+(k%3)*9;line(c,[[Math.cos(a)*r,Math.sin(a)*67],[Math.cos(a-.11)*(r+28),Math.sin(a-.11)*84]],palette[k%3],2);}
  c.restore();
 }
-function mountScene(canvas,state,getEvent,onTarget){
+// Clip only the sprite layer: erasing never covers notebook lines or other characters.
+function paperSprite(c,box,birth,death,draw,tools){
+ const erasing=death!==null,progress=erasing?limit(death):limit(birth);
+ if(erasing&&progress>=1||!erasing&&progress<=0)return;
+ if(!erasing&&progress>=1){draw();return;}
+ const {x,y,w,h}=box,rows=Math.ceil(h/19),rowH=h/rows,scan=progress*rows,row=Math.min(rows-1,Math.floor(scan)),fraction=scan-row;
+ const tipX=x+(row%2?1-fraction:fraction)*w,tipY=y+(row+.5)*rowH;
+ c.save();c.beginPath();
+ if(erasing){
+  c.rect(x,y+(row+1)*rowH,w,h-(row+1)*rowH+2);
+  c.rect(row%2?x:tipX,y+row*rowH,row%2?tipX-x:x+w-tipX,rowH);
+ }else{
+  c.rect(x,y,w,row*rowH);
+  c.rect(row%2?tipX:x,y+row*rowH,row%2?x+w-tipX:tipX-x,rowH);
+ }
+ c.clip();draw();c.restore();tools.push({x:tipX,y:tipY,erasing,progress});
+}
+function paperTool(c,tool,time){
+ const {x,y,erasing,progress}=tool;c.save();c.translate(x,y);
+ // Short graphite strokes / eraser crumbs travel with the contact point.
+ for(let k=0;k<9;k++){const dx=Math.sin(k*2.3+time*9)*22,dy=6+(k*7+time*35)%24;c.globalAlpha=.65*(1-dy/40);line(c,[[dx,dy],[dx+3,dy+2]],erasing?'#b0a392':'#625b52',erasing?2.8:1);}
+ c.globalAlpha=1;
+ if(erasing){c.rotate(-.18+Math.sin(progress*58)*.12);c.shadowColor='#40362f33';c.shadowBlur=4;c.shadowOffsetY=4;c.beginPath();c.roundRect(-25,-18,53,29,5);c.fillStyle='#edb1ad';c.fill();c.strokeStyle='#665451';c.lineWidth=2;c.stroke();c.shadowBlur=0;c.shadowOffsetY=0;c.fillStyle='#f8eee0';c.fillRect(-7,-17,19,27);line(c,[[-6,-12],[10,-12]],'#b9aa98',1);line(c,[[-20,5],[-12,5]],'#d58f91',2);}
+ else{c.rotate(.62+Math.sin(time*22)*.035);line(c,[[0,0],[-7,-19],[7,-19]],'#514638',1.6,'#d7b68a',true);line(c,[[0,0],[-2,-6],[2,-6]],'#302d29',1,'#302d29',true);line(c,[[-7,-19],[-7,-88],[7,-88],[7,-19]],'#655034',1.8,'#efbc49',true);line(c,[[-2,-20],[-2,-86]],'#ffde83',3);line(c,[[-7,-82],[7,-82]],'#827d72',6);line(c,[[-7,-87],[-7,-99],[7,-99],[7,-87]],'#765e59',1.5,'#d9908b',true);}
+ c.restore();
+}
+function mountScene(canvas,state,getEvent,onTarget,entrance=false){
  stopScene();backdrop??=createBackdrop();const c=canvas.getContext('2d'),W=1100,H=500,reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
  const leadKind=state.enemy.kind,leadHeight=leadKind==='boss'?260:leadKind==='epic'?210:130;
  const positions=[[110,385],[270,357],[425,385],[570,357]],enemyPositions=[[865,350],[730,421],[1010,420]];
- canvas.onclick=e=>{if(getEvent()||state.status!=='playing')return;const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;for(const id of [1,2,0]){const [ex,ey]=enemyPositions[id],w=id===0?125:72,h=id===0?leadHeight:130;if(state.enemies[id].hp>0&&x>ex-w&&x<ex+w&&y>ey-h&&y<ey+20){onTarget?.(id);break;}}};
+ canvas.onclick=e=>{if(getEvent()||state.status!=='playing'||entrance&&!reduced&&(performance.now()-born)/1000<ENTRANCE_SECONDS)return;const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;for(const id of [1,2,0]){const [ex,ey]=enemyPositions[id],w=id===0?125:72,h=id===0?leadHeight:130;if(state.enemies[id].hp>0&&x>ex-w&&x<ex+w&&y>ey-h&&y<ey+20){onTarget?.(id);break;}}};
+ const born=performance.now();
  let impactSound=false,counterSound=false,lastEvent=null;
  function draw(now){
   if(!canvas.isConnected)return;
   const rect=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2),pw=Math.round(rect.width*dpr),ph=Math.round(rect.height*dpr);
   if(canvas.width!==pw||canvas.height!==ph){canvas.width=pw;canvas.height=ph;}
   c.setTransform(pw/W,0,0,ph/H,0,0);c.clearRect(0,0,W,H);
+  const tools=[],introAge=(now-born)/1000;
+  const birth=i=>entrance&&!reduced?(introAge-i*SKETCH_STAGGER)/SKETCH_SECONDS:1;
+  const death=(side,i)=>{const at=getEvent()?.removals?.[side][i];return at===null||at===undefined?null:(now-getEvent().start)/1000<at?null:reduced?1:((now-getEvent().start)/1000-at)/ERASE_SECONDS;};
   const t=now/1000,ev=getEvent(),dt=ev?Math.max(0,(now-ev.start)/1000):0;
   if(ev!==lastEvent){lastEvent=ev;impactSound=false;counterSound=false;}
   if(ev&&dt>=.6&&!ev.previewed){ev.previewed=true;ev.onImpact?.();}if(ev?.summonAttack&&dt>=1.12&&!ev.summonPreviewed){ev.summonPreviewed=true;ev.onSummon?.();}if(ev?.counter&&dt>=ACTION_SECONDS+.39&&!ev.counterPreviewed){ev.counterPreviewed=true;ev.onCounter?.();}
@@ -372,22 +417,24 @@ function mountScene(canvas,state,getEvent,onTarget){
   c.drawImage(backdrop,0,0);
   // Atmospheric drifting pencil flecks, kept sparse to leave the characters clear.
   if(!reduced)for(let k=0;k<13;k++){const x=(k*93+t*9)%W,y=190+Math.sin(t*.6+k)*55;spark(c,x,y,1.4,'#b7aa8580',k+t*.2);}
-  radiance(c,kingX,kingY-80,150,'#7c55a51a');
+
   if(skill&&dt<.6){c.save();c.globalAlpha=Math.sin(limit(dt/.6)*Math.PI)*.09;c.fillStyle=palette[0];c.fillRect(0,0,W,H);c.restore();}
   if(bossStrikes&&enemyT>=0&&enemyT<.5)ring(c,kingX,kingY-5,60+enemyT*90,'#704393',-t,1);
   const recoil=attack&&age>=0&&age<.5?Math.sin(age*23)*Math.exp(-age*5):0;
-  if(leadKind==='boss')drawInkKing(c,kingX,kingY,t,reduced||target!==0?0:recoil,bossStrikes&&enemyT>=0?Math.sin(limit(enemyT/.7)*Math.PI):0,enemyHP[0]===0,reduced);
+  if(state.enemy.hp>0)paperSprite(c,leadKind==='boss'?{x:kingX-150,y:kingY-285,w:335,h:303}:{x:kingX-(leadKind==='epic'?120:100),y:kingY-leadHeight-10,w:leadKind==='epic'?240:200,h:leadHeight+28},birth(4),death('enemies',0),()=>{
+  if(leadKind==='boss')drawInkKing(c,kingX,kingY,t,reduced||target!==0?0:recoil,bossStrikes&&enemyT>=0?Math.sin(limit(enemyT/.7)*Math.PI):0,false,reduced);
   else{
    const striking=ev?.enemyStrikes.some(h=>h.enemy===0)&&enemyT>=.2&&enemyT<.9;
    const leap=striking&&!reduced?Math.sin(limit((enemyT-.2)/.7)*Math.PI):0;
    if(leadKind==='epic'){radiance(c,kingX,kingY-90,145,'#a750da44');ring(c,kingX,kingY,75,'#9e61c4',t*.3,.7);for(let k=0;k<5;k++)spark(c,kingX+Math.sin(t+k*1.2)*72,kingY-90+Math.cos(t+k*1.2)*90,4,'#b77adb',t);}
-   drawExtra(c,leadKind==='slime'?2:3,kingX-leap*35+(target===0&&!reduced?recoil*7:0),kingY-leap*20,leadHeight,t,enemyHP[0]===0,0);
+   drawExtra(c,leadKind==='slime'?2:3,kingX-leap*35+(target===0&&!reduced?recoil*7:0),kingY-leap*20,leadHeight,t,false,0);
    letters(c,leadKind==='epic'?'✦ EPIC · 해골 대장':'먹물 슬라임',kingX,kingY+22,13,leadKind==='epic'?'#8b4ca8':'#67546f');
   }
+  },tools);
   for(const id of [1,2]){let [ex,ey]=enemyPositions[id];const hit=target===id&&attack&&age>=0&&age<.4;const striking=ev?.enemyStrikes.some(h=>h.enemy===id)&&enemyT>=.2&&enemyT<.9;
    if(striking&&!reduced){const leap=Math.sin(limit((enemyT-.2)/.7)*Math.PI);ex-=leap*32;ey-=leap*16;}
    if(hit&&!reduced)ex+=Math.sin(age*30)*7;
-   drawExtra(c,id===1?2:3,ex,ey,id===1?95:130,t,enemyHP[id]===0,hit?Math.sin(age*30)*.07:0);
+   if(state.enemies[id].hp>0)paperSprite(c,{x:ex-82,y:ey-(id===1?108:142),w:164,h:id===1?125:160},birth(4+id),death('enemies',id),()=>drawExtra(c,id===1?2:3,ex,ey,id===1?95:130,t,false,hit?Math.sin(age*30)*.07:0),tools);
    letters(c,state.enemies[id].name,ex,ey+18,10,enemyHP[id]?'#67546f':'#a99da4');
    c.fillStyle='#5e4c6555';c.fillRect(ex-33,ey+23,66,5);c.fillStyle='#ab5967';c.fillRect(ex-33,ey+23,66*enemyHP[id]/state.enemies[id].maxHp,5);
   }
@@ -408,11 +455,12 @@ function mountScene(canvas,state,getEvent,onTarget){
    }
    if(enemyHit&&hero.hp>0&&ev.damageTaken[i]>0&&!reduced){const r=Math.sin((enemyT-.39)*24)*Math.exp(-(enemyT-.39)*6);x-=r*8;rotation-=r*.1;}
    if(reduced){x=active&&attack?ox+(bx-130-ox)*(pose.reach>.1?.45:0):ox;y=oy;rotation=0;bend=0;scaleX=1;scaleY=1;}
-   if(hero.hp>0){oval(c,x,y+5,35,5,'#4f493d18');if(hero.guard)ring(c,x,y,44,'#c6a044',t*.3,.65);}
+   const visibleHero=hero.hp>0&&(death('party',i)===null||death('party',i)<1)&&birth(i)>0;
+   if(visibleHero){oval(c,x,y+5,35,5,'#4f493d18');if(hero.guard)ring(c,x,y,44,'#c6a044',t*.3,.65);}
    if(state.turn===i&&state.status==='playing'){oval(c,x,y+7,41,8,'#8e9a4822','#71854d',1.5);if(!ev)letters(c,'▼',x,y-heroHeights[id]-12,15,'#63794a');}
    if(active&&attack&&pose.reach>.08&&!pose.returning&&!reduced){for(let ghost=3;ghost>0;ghost--)drawDoodle(c,id,x-ghost*21,y+ghost*2,t,{bend,rotation,still:true},.05+(3-ghost)*.025);for(let k=0;k<7;k++)line(c,[[x-65-k*14,y-18-k*17],[x-95-k*21,y-17-k*17]],palette[0]+'66',1.5);}
-   drawDoodle(c,id,x,y,pose?.hitStop?Math.floor(t*8)/8:t,{bend,rotation,scaleX,scaleY,dead:hero.hp===0,still:reduced});
-   if(active&&(ev.action==='guard'||heal||(!attack&&skill))||hero.guard){const color=heal?'#d779a4':'#d6ad49';oval(c,x,y-75,48,87,color+'0e',color+'aa',2);}
+   if(hero.hp>0)paperSprite(c,{x:x-140,y:y-195,w:280,h:215},birth(i),death('party',i),()=>drawDoodle(c,id,x,y,pose?.hitStop?Math.floor(t*8)/8:t,{bend,rotation,scaleX,scaleY,still:reduced}),tools);
+   if(visibleHero&&(active&&(ev.action==='guard'||heal||(!attack&&skill))||hero.guard)){const color=heal?'#d779a4':'#d6ad49';oval(c,x,y-75,48,87,color+'0e',color+'aa',2);}
    letters(c,hero.name,x,y+30,12,hero.color);drawn.push([x,y]);
    if(enemyHit&&hero.hp>0&&ev.damageTaken[i]>0){spray(c,x,y-65,(enemyT-.39)*1.8,['#3e2e50','#9770bc','#dfc5ed'],18,.55);letters(c,'−'+ev.damageTaken[i],x,y-155-(enemyT-.39)*50,23,'#70448f');}
   }
@@ -453,6 +501,7 @@ function mountScene(canvas,state,getEvent,onTarget){
    if(attack&&age>=0&&!impactSound){impactSound=true;sound('hit',ev.sound);}
    if(enemyHit&&!counterSound){counterSound=true;sound('hit',ev.sound);}
   }
+  for(const tool of tools)paperTool(c,tool,t);
   if(state.status==='victory'){for(let k=0;k<22;k++)spark(c,(k*83+Math.sin(t+k)*20)%W,(t*30+k*37)%H,3+(k%3),palettes[k%6][1],t+k);}
   c.restore();frame=requestAnimationFrame(draw);
  }
@@ -549,7 +598,7 @@ function showParty(mode='start',notice=''){
 function confirmNewGame(){
  const dialog=document.createElement('dialog');dialog.className='paper-dialog';dialog.innerHTML='<form method="dialog"><span>새로운 페이지</span><h2>새 모험을 시작할까요?</h2><p>현재 저장된 전투 기록이 새 모험으로 바뀝니다.</p><div><button value="cancel" class="plain">돌아가기</button><button value="start" class="primary">새 모험 시작</button></div></form>';document.body.append(dialog);dialog.addEventListener('close',()=>{const value=dialog.returnValue;dialog.remove();if(value==='start')start(selected);},{once:true});dialog.showModal();
 }
-function start(ids=selected){cancelScene();selected=[...ids];writeStorage(PARTY_KEY,JSON.stringify(selected));state=createBattle(selected);saveProgress();render();}
+function start(ids=selected){cancelScene();selected=[...ids];writeStorage(PARTY_KEY,JSON.stringify(selected));state=createBattle(selected);saveProgress();render(true);}
 function skillSummary(h){
  const parts=[];
  if(h.power)parts.push((h.area?'적 전체 ':'선택한 적 ')+h.power+' 피해');
@@ -581,14 +630,21 @@ function battleResult(){
  if(state.status==='cleared')return `<div class="result stage-clear"><span class="eyebrow">${state.encounter+1} / 3 COMPLETE</span><h2>✧ ${encounters[state.encounter].name} 돌파!</h2><p>잠깐 쉬고 <strong>${encounters[state.encounter+1].name}</strong>에게 도전하세요.</p><p>생존 동료: 최대 HP의 35% 회복 · 쓰러진 동료: HP 25%로 복귀<br>모두 MP +14 · 보호와 소환은 다음 전투에서 초기화</p><button class="primary" id="next-encounter">휴식 후 ${encounters[state.encounter+1].name} 도전 →</button></div>`;
  return `<div class="result"><h2>${state.status==='victory'?'✧ 1스테이지를 지켰어요!':'☾ 용사단이 모두 쓰러졌어요.'}</h2><p>${state.status==='victory'?'획득 보상: 별 조각 30개 · 데모 스테이지 완료':'강공 예고에 맞춰 보호·방어를 사용하고, 일반 몬스터부터 줄여보세요.'}</p><button class="primary" id="retry">1스테이지 처음부터 ↗</button></div>`;
 }
-function nextEncounter(){if(busy||!advanceEncounter(state))return;cancelScene();saveProgress();render();document.querySelector('.battle-top').scrollIntoView({block:'start'});}
-function render(){const done=state.status!=='playing';const h=state.party[state.turn];document.body.classList.remove('title-view');app.innerHTML=`<section class="battle-top"><div><span class="eyebrow">CHAPTER 01 / 낙서의 숲</span><h1>${state.encounter>=0?'1-'+(state.encounter+1)+' · '+encounters[state.encounter].name:'이전 모험 이어가기'}</h1><small class="save-status">${storageFailed?'자동 저장을 사용할 수 없습니다':'✎ 행동이 끝날 때마다 자동 저장됩니다'}</small></div><div class="battle-nav"><button class="plain" id="sound" aria-pressed="${soundEnabled}">효과음 ${soundEnabled?'ON':'OFF'}</button><button class="plain" id="back">← 공책으로</button></div></section>${encounterProgress()}<p class="counter-hint" aria-live="polite">다음 반격 · ${enemyIntent(state)}</p><section class="arena"><div class="enemy-info"><span>${state.enemy.kind==='boss'?'♛':state.enemy.kind==='epic'?'✦':'●'} ${state.enemy.name} <small>${state.enemy.hp} / ${state.enemy.maxHp}</small></span><div class="bar enemy-bar"><i style="width:${state.enemy.hp/state.enemy.maxHp*100}%"></i></div><p>${state.encounter===0?'일반 몬스터 · 각자 1명 공격':state.encounter===1?'에픽 · 매 3턴 전체 강공':state.encounter===2?'보스 · 매 3턴 강공 / HP 50%↓ 광폭':'이전 모험의 보스전'}</p></div><span class="round">TURN<br><b>${String(state.round).padStart(2,'0')}</b></span><canvas id="battle-scene" role="img" aria-label="용사 네 명과 ${state.enemy.name} 무리의 애니메이션 전장"></canvas><div class="scene-label"><span>✎ NOTEBOOK HEROES</span><span id="action-caption">${done?'오늘 밤의 이야기를 기록했어요.':h.name+' · 행동을 선택하세요'}</span></div></section>${targetControls()}<div class="battle-bottom"><section class="battle-control"><div class="party-stats">${state.party.map((p,i)=>`<div class="stat ${!done&&state.turn===i?'selected':''} ${p.hp===0?'fallen':''}" style="--hero:${p.color}"><canvas class="hero-portrait stat-portrait" data-hero="${p.id}" aria-hidden="true"></canvas><strong>${p.name}</strong><span>HP ${p.hp} / ${p.maxHp}</span><div class="bar"><i style="width:${p.hp/p.maxHp*100}%"></i></div><small>MP ${p.mp} / ${p.maxMp} ${p.guard?'· 방어 중':''}${state.summon?.owner===p.id?' · 정령 '+state.summon.rounds+'회':''}</small></div>`).join('')}</div>${done?battleResult():`<div class="actions"><div><small>${busy?'행동을 기록하는 중…':'당신의 선택을 기다리고 있어요'}</small><h2>${h.name}의 차례</h2></div><div class="action-buttons"><button data-action="attack" ${busy?'disabled':''}>${actionIcon('attack')}<span>공격</span><small>기본 피해 ${h.atk}</small></button>${skillButtons(h)}<button data-action="guard" ${busy?'disabled':''}>${actionIcon('guard')}<span>방어</span><small>피해 65% 감소 · MP +5</small></button></div></div>`}</section><aside class="journal"><h3>✎ 모험의 기록</h3><div role="log" aria-live="polite">${state.log.slice(-5).map(l=>`<p>${escapeHTML(l)}</p>`).join('')}</div></aside></div>`;document.querySelector('#back').onclick=home;if(state.status==='cleared')document.querySelector('#next-encounter').onclick=nextEncounter;else if(done)document.querySelector('#retry').onclick=()=>start(state.party.map(p=>p.id));document.querySelector('#sound').onclick=()=>{soundEnabled=!soundEnabled;const b=document.querySelector('#sound');b.textContent='효과음 '+(soundEnabled?'ON':'OFF');b.setAttribute('aria-pressed',soundEnabled);sound('magic',soundEnabled);};mountScene(document.querySelector('#battle-scene'),state,()=>event,chooseTarget);paintPortraits();document.querySelectorAll('[data-target]').forEach(b=>b.onclick=()=>chooseTarget(Number(b.dataset.target)));document.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>playAction(b.dataset.action,Number(b.dataset.skill||0)));}
+function nextEncounter(){if(busy||!advanceEncounter(state))return;cancelScene();saveProgress();render(true);document.querySelector('.battle-top').scrollIntoView({block:'start'});}
+function render(entrance=false){entrance=entrance&&!matchMedia('(prefers-reduced-motion: reduce)').matches;if(entrance)busy=true;const done=state.status!=='playing';const h=state.party[state.turn];document.body.classList.remove('title-view');app.innerHTML=`<section class="battle-top"><div><span class="eyebrow">CHAPTER 01 / 낙서의 숲</span><h1>${state.encounter>=0?'1-'+(state.encounter+1)+' · '+encounters[state.encounter].name:'이전 모험 이어가기'}</h1><small class="save-status">${storageFailed?'자동 저장을 사용할 수 없습니다':'✎ 행동이 끝날 때마다 자동 저장됩니다'}</small></div><div class="battle-nav"><button class="plain" id="sound" aria-pressed="${soundEnabled}">효과음 ${soundEnabled?'ON':'OFF'}</button><button class="plain" id="back">← 공책으로</button></div></section>${encounterProgress()}<p class="counter-hint" aria-live="polite">다음 반격 · ${enemyIntent(state)}</p><section class="arena"><div class="enemy-info"><span>${state.enemy.kind==='boss'?'♛':state.enemy.kind==='epic'?'✦':'●'} ${state.enemy.name} <small>${state.enemy.hp} / ${state.enemy.maxHp}</small></span><div class="bar enemy-bar"><i style="width:${state.enemy.hp/state.enemy.maxHp*100}%"></i></div><p>${state.encounter===0?'일반 몬스터 · 각자 1명 공격':state.encounter===1?'에픽 · 매 3턴 전체 강공':state.encounter===2?'보스 · 매 3턴 강공 / HP 50%↓ 광폭':'이전 모험의 보스전'}</p></div><span class="round">TURN<br><b>${String(state.round).padStart(2,'0')}</b></span><canvas id="battle-scene" role="img" aria-label="용사 네 명과 ${state.enemy.name} 무리의 애니메이션 전장"></canvas>${entrance?'<button id="skip-sketch" class="plain sketch-skip">등장 연출 건너뛰기 →</button>':''}<div class="scene-label"><span>✎ NOTEBOOK HEROES</span><span id="action-caption">${done?'오늘 밤의 이야기를 기록했어요.':h.name+' · 행동을 선택하세요'}</span></div></section>${targetControls()}<div class="battle-bottom"><section class="battle-control"><div class="party-stats">${state.party.map((p,i)=>`<div class="stat ${!done&&state.turn===i?'selected':''} ${p.hp===0?'fallen':''}" style="--hero:${p.color}"><canvas class="hero-portrait stat-portrait" data-hero="${p.id}" aria-hidden="true"></canvas><strong>${p.name}</strong><span>HP ${p.hp} / ${p.maxHp}</span><div class="bar"><i style="width:${p.hp/p.maxHp*100}%"></i></div><small>MP ${p.mp} / ${p.maxMp} ${p.guard?'· 방어 중':''}${state.summon?.owner===p.id?' · 정령 '+state.summon.rounds+'회':''}</small></div>`).join('')}</div>${done?battleResult():`<div class="actions"><div><small>${busy?'행동을 기록하는 중…':'당신의 선택을 기다리고 있어요'}</small><h2>${h.name}의 차례</h2></div><div class="action-buttons"><button data-action="attack" ${busy?'disabled':''}>${actionIcon('attack')}<span>공격</span><small>기본 피해 ${h.atk}</small></button>${skillButtons(h)}<button data-action="guard" ${busy?'disabled':''}>${actionIcon('guard')}<span>방어</span><small>피해 65% 감소 · MP +5</small></button></div></div>`}</section><aside class="journal"><h3>✎ 모험의 기록</h3><div role="log" aria-live="polite">${state.log.slice(-5).map(l=>`<p>${escapeHTML(l)}</p>`).join('')}</div></aside></div>`;document.querySelector('#back').onclick=home;if(state.status==='cleared')document.querySelector('#next-encounter').onclick=nextEncounter;else if(done)document.querySelector('#retry').onclick=()=>start(state.party.map(p=>p.id));document.querySelector('#sound').onclick=()=>{soundEnabled=!soundEnabled;const b=document.querySelector('#sound');b.textContent='효과음 '+(soundEnabled?'ON':'OFF');b.setAttribute('aria-pressed',soundEnabled);sound('magic',soundEnabled);};mountScene(document.querySelector('#battle-scene'),state,()=>event,chooseTarget,entrance);paintPortraits();document.querySelectorAll('[data-target]').forEach(b=>b.onclick=()=>chooseTarget(Number(b.dataset.target)));document.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>playAction(b.dataset.action,Number(b.dataset.skill||0)));
+ if(entrance){
+  document.querySelectorAll('[data-action],[data-target]').forEach(b=>b.disabled=true);
+  document.querySelector('#action-caption').textContent='연필로 오늘 밤의 친구들을 그리는 중…';
+  const finish=()=>{clearTimeout(timer);busy=false;render();};
+  document.querySelector('#skip-sketch').onclick=finish;timer=setTimeout(finish,ENTRANCE_SECONDS*1000);
+ }
+}
 function playAction(action,skillIndex=0){
  if(busy||state.status!=='playing')return;
  const next=structuredClone(state),actor=state.turn;
  if(!act(next,action,skillIndex))return;
  busy=true;
- event={sound:soundEnabled,actor,kind:next.last.kind,skillName:next.last.skillName,area:next.last.area,guard:next.last.guard,drain:next.last.drain,damageByTarget:next.last.damageByTarget,action,start:performance.now(),damage:next.last.damage,healing:next.last.healing,target:next.last.target,afterAction:next.last.enemyHP,afterSupport:next.enemies.map(e=>e.hp),summonAttack:next.last.summonAttack,enemyStrikes:next.last.enemyStrikes,counter:next.last.counter,heavy:state.round%3===0,damageTaken:state.party.map((p,i)=>p.hp+next.last.healing[i]-next.party[i].hp)};
+ event={removals:removalTimes(state,next),sound:soundEnabled,actor,kind:next.last.kind,skillName:next.last.skillName,area:next.last.area,guard:next.last.guard,drain:next.last.drain,damageByTarget:next.last.damageByTarget,action,start:performance.now(),damage:next.last.damage,healing:next.last.healing,target:next.last.target,afterAction:next.last.enemyHP,afterSupport:next.enemies.map(e=>e.hp),summonAttack:next.last.summonAttack,enemyStrikes:next.last.enemyStrikes,counter:next.last.counter,heavy:state.round%3===0,damageTaken:state.party.map((p,i)=>p.hp+next.last.healing[i]-next.party[i].hp)};
  event.onImpact=()=>{
   updateEnemyDisplay(next.last.enemyHP);
   document.querySelectorAll('.stat').forEach((el,i)=>{
@@ -603,7 +659,7 @@ function playAction(action,skillIndex=0){
  document.querySelectorAll('[data-action],[data-target]').forEach(b=>b.disabled=true);
  document.querySelector('#action-caption').textContent=state.party[actor].name+' · '+(action==='skill'?next.last.skillName:action==='guard'?'수호 태세':'기본 공격');
  sound(['magic','heal','summon','drain'].includes(event.kind)?'magic':'hit',soundEnabled);
- timer=setTimeout(()=>{state=next;event=null;busy=false;saveProgress();render();},animationDuration(event.counter));
+ timer=setTimeout(()=>{state=next;event=null;busy=false;saveProgress();render();},animationDuration(event.counter,event.removals));
 }
 document.querySelector('#home-link').onclick=e=>{e.preventDefault();selected=initialParty();home();};home();
 </script></body></html>
