@@ -10,7 +10,7 @@
 
 **[Unity 프로젝트 ZIP 다운로드](https://github.com/WooooTae/Note_Demo/raw/refs/heads/main/release/Notebook-Heroes-Unity.zip)**
 
-Unity 6.0 LTS에서 열 수 있는 네이티브 C# 이식 프로토타입입니다. 10개 직업·30개 스킬, 동료 5종, 3연전, 테이프 봉인, 파일 저장을 포함합니다. ZIP은 실행 파일이 아닌 소스 프로젝트입니다. 열기·빌드 방법과 검증 제한은 [Unity 안내](unity/NotebookHeroes/README.md)를 참고하세요. 현재 환경에서는 Unity 에디터 Play와 Windows 빌드를 실행하지 못했습니다.
+Unity 6.0 LTS에서 열 수 있는 네이티브 C# 이식 프로토타입입니다. 10개 직업·30개 스킬, 동료 5종, 3연전, 테이프 봉인, 파일 저장을 포함합니다. ZIP은 실행 파일이 아닌 소스 프로젝트입니다. 캐릭터 영역의 임포트 크기 보정과 원래 네 칸 공책 도감(스크롤·스프링·이름 동그라미)을 반영했습니다. 열기·빌드 방법과 검증 제한은 [Unity 안내](unity/NotebookHeroes/README.md)를 참고하세요. 현재 환경에서는 Unity 에디터 Play와 Windows 빌드를 실행하지 못했습니다.
 
 기존 JavaScript와 C# 전투 로직은 80개 시나리오, 4,034번의 행동/전환 결과를 비교해 일치함을 확인했습니다. .NET 8이 설치되어 있다면 다음 명령으로 재검증할 수 있습니다.
 

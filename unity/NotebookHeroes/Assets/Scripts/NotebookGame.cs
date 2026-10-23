@@ -12,7 +12,7 @@ namespace NotebookHeroes
   Catalog data; Battle battle; Font font; RectTransform root,arena; bool busy,skipSketch; int friend,rosterPage;
   readonly List<int> party=new List<int>{0,1,2,3}; readonly Image[] heroImages=new Image[4],enemyImages=new Image[3];
   readonly Color ink=new Color(.24f,.25f,.22f),paper=new Color(.94f,.94f,.89f),pale=new Color(.87f,.89f,.80f);
-  string screen="",notice=""; Material graphite;
+  string screen="",notice="",rosterNotice="";float rosterOffset; Material graphite;
   [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)] static void Boot(){if(FindFirstObjectByType<NotebookGame>()==null)new GameObject("Notebook Heroes").AddComponent<NotebookGame>();}
   void Awake()
   {
@@ -30,9 +30,9 @@ namespace NotebookHeroes
   Image Box(Transform parent,float x,float y,float w,float h,Color color){var rt=Rect("Paper",parent,x,y,w,h);var im=rt.gameObject.AddComponent<Image>();im.color=color;im.raycastTarget=false;return im;}
   Text Label(Transform parent,string value,float x,float y,float w,float h,int size=26,TextAnchor alignment=TextAnchor.MiddleLeft){var rt=Rect(value,parent,x,y,w,h);var t=rt.gameObject.AddComponent<Text>();t.font=font;t.fontSize=size;t.color=ink;t.text=value;t.supportRichText=false;t.alignment=alignment;t.raycastTarget=false;t.horizontalOverflow=HorizontalWrapMode.Wrap;t.verticalOverflow=VerticalWrapMode.Truncate;return t;}
   Button Button(Transform parent,string text,float x,float y,float w,float h,Action action,bool enabled=true,Color? color=null){var im=Box(parent,x,y,w,h,color??pale);im.raycastTarget=true;var b=im.gameObject.AddComponent<Button>();b.targetGraphic=im;b.interactable=enabled;b.onClick.AddListener(()=>action());var colors=b.colors;colors.highlightedColor=new Color(1,.97f,.77f);colors.pressedColor=new Color(.84f,.86f,.69f);colors.disabledColor=new Color(.75f,.75f,.72f,.65f);b.colors=colors;Label(im.transform,text,10,4,w-20,h-8,25,TextAnchor.MiddleCenter);return b;}
-  Image Art(Transform parent,Sprite sprite,float x,float y,float w,float h,bool pencil=true){var im=Box(parent,x,y,w,h,Color.white);im.sprite=sprite;im.preserveAspect=true;if(pencil&&graphite!=null)im.material=graphite;return im;}
+  Image Art(Transform parent,Sprite sprite,float x,float y,float w,float h,bool pencil=true){var im=Box(parent,x,y,w,h,Color.white);im.sprite=sprite;im.preserveAspect=true;im.useSpriteMesh=true;if(pencil&&graphite!=null)im.material=graphite;return im;}
   static Color Hex(string s){ColorUtility.TryParseHtmlString(s,out var c);return c;}
-  void Page(string name){screen=name;for(int i=root.childCount-1;i>=0;i--){var g=root.GetChild(i).gameObject;g.SetActive(false);Destroy(g);}Array.Clear(heroImages,0,4);Array.Clear(enemyImages,0,3);Box(root,0,0,1600,1000,paper);for(int y=35;y<1000;y+=35)Box(root,0,y,1600,1,new Color(.71f,.76f,.76f,.35f));Box(root,70,0,2,1000,new Color(.78f,.55f,.51f,.35f));for(int y=35;y<1000;y+=80){Label(root,"⊂",4,y,50,45,48);Box(root,44,y+20,6,6,ink);}Label(root,"낙서 용사단  /  NOTEBOOK HEROES",95,18,1200,45,27);Label(root,"아이가 잠든 사이, 우리의 모험은 시작된다.",100,953,1200,32,20);}
+  void Page(string name){screen=name;for(int i=root.childCount-1;i>=0;i--){var g=root.GetChild(i).gameObject;g.SetActive(false);Destroy(g);}Array.Clear(heroImages,0,4);Array.Clear(enemyImages,0,3);var backdrop=Box(root,0,0,1600,1000,paper);if(name=="roster"){backdrop.sprite=PaperArt.Desk();backdrop.color=Color.white;return;}for(int y=35;y<1000;y+=35)Box(root,0,y,1600,1,new Color(.71f,.76f,.76f,.35f));Box(root,70,0,2,1000,new Color(.78f,.55f,.51f,.35f));for(int y=35;y<1000;y+=80){Ellipse(root,2,y+10,45,16,ink,3,-.25f);Box(root,44,y+20,6,6,ink);}Label(root,"낙서 용사단  /  NOTEBOOK HEROES",95,18,1200,45,27);Label(root,"아이가 잠든 사이, 우리의 모험은 시작된다.",100,953,1200,32,20);}
   void Heading(string title,string subtitle){Label(root,title,100,83,1350,65,44);Label(root,subtitle,100,145,1350,48,25);}
   void Home()
   {
@@ -48,12 +48,41 @@ namespace NotebookHeroes
   readonly string[] storyTitles={"늘 혼자였던 아이","연필 끝에서 만난 친구들","모두가 잠든 밤","공책 속 친구들이 깨어납니다"};
   readonly string[] storyLines={"함께 놀 친구가 있다면 좋을 텐데.","용감한 기사도, 신비한 마법사도… 내 친구가 되어줄래?","아이가 잠들자, 종이 넘기는 소리가 들렸습니다.","우리를 그려준 아이의 꿈을, 함께 지키자. 아이는 아직 이 비밀을 모릅니다."};
   void Intro(int n){Page("intro");Heading(storyTitles[n],storyLines[n]);Art(root,PaperArt.Intro(n),230,220,1140,600,false);Button(root,"건너뛰기 →",1200,85,280,60,()=>Roster());if(n>0)Button(root,"← 이전",230,850,280,65,()=>Intro(n-1));Button(root,n==3?"친구 고르기 →":"다음 장면 →",1040,850,330,65,()=>{if(n==3)Roster();else Intro(n+1);});}
+  void Stroke(Transform parent,float x,float y,float w,float h,Vector2[] points,Color color,float thickness=1.5f){var rt=Rect("Pencil line",parent,x,y,w,h);var g=rt.gameObject.AddComponent<PencilStroke>();g.color=color;g.points=points;g.thickness=thickness;g.raycastTarget=false;}
+  void Ellipse(Transform parent,float x,float y,float w,float h,Color color,float thickness=2,float tilt=0){var points=new Vector2[65];for(int i=0;i<points.Length;i++){float a=i/64f*Mathf.PI*2;float px=Mathf.Cos(a)*w*.48f,py=Mathf.Sin(a)*h*.45f;points[i]=new Vector2(w/2+px,-h/2+py+px*tilt+Mathf.Sin(a*5)*.7f);}Stroke(parent,x,y,w,h,points,color,thickness);}
+  string SkillNote(Ability a){string text=a.power>0?(a.area?"적 전체 ":"선택한 적 ")+a.power+" 피해":"";if(a.heal>0)text+="생존 아군 전체 HP "+a.heal+" 회복";if(a.guard!=null)text+=" · "+(a.guard=="party"?"아군 전체":"자신")+" 보호";if(a.summon)text+=" · 정령 3회";if(a.drain)text+=" · 피해의 절반 흡수";return text;}
   void Roster()
   {
-   Page("roster");Heading("나의 낙서 용사 도감","네 명에게 동그라미를 쳐 주세요. 선택 순서대로 행동합니다.");
-   int start=rosterPage*4;for(int k=0;k<4&&start+k<data.roles.Length;k++){int id=start+k;var r=data.roles[id];float x=130+k%2*730,y=215+k/2*290;var card=Button(root,"",x,y,690,270,()=>{if(party.Contains(id))party.Remove(id);else if(party.Count<4)party.Add(id);Roster();},true,Color.white*.95f);Art(card.transform,PaperArt.Hero(id),5,20,225,220);Label(card.transform,(party.Contains(id)?"○ "+(party.IndexOf(id)+1)+". ":"")+r.name,240,12,435,45,33);Label(card.transform,"HP "+r.hp+"   MP "+r.mp+"   공격 "+r.atk,240,65,430,35,23);for(int a=0;a<3;a++)Label(card.transform,r.skills[a].name+" · MP "+r.skills[a].cost,240,110+a*39,430,36,24);}
-   Button(root,"← 앞장",130,810,200,55,()=>{rosterPage--;Roster();},rosterPage>0);Label(root,(rosterPage+1)+" / 3쪽",365,810,250,55,25);Button(root,"뒷장 →",640,810,200,55,()=>{rosterPage++;Roster();},rosterPage<2);
-   Label(root,"우리 용사단  "+party.Count+" / 4",130,888,600,50,28);Button(root,"포스트잇 친구 선택 →",1030,870,450,65,()=>Friends(false,StartBattle),party.Count==4);Button(root,"← 공책으로",1200,85,280,60,Home);
+   Page("roster");Label(root,"쉬는 시간에 그린, 우리들만의 RPG",100,22,1200,35,24);Label(root,"나의 낙서 용사 도감",100,64,1100,65,46);Label(root,"같이 모험할 친구 4명에게 동그라미를 쳐 주세요.",100,130,1200,42,27);
+   Button(root,"← 공책 덮기",1250,55,250,65,Home,true,Hex("#ece7d0"));
+   for(int i=0;i<4;i++){Box(root,100+i*353,190,338,55,Hex("#ebe7d6"));Label(root,(i+1)+"번  "+(i<party.Count?data.roles[party[i]].name:"빈 자리"),115+i*353,195,310,44,26);}
+   var scrollRoot=Rect("Notebook scroll",root,80,270,1440,565);var scroll=scrollRoot.gameObject.AddComponent<ScrollRect>();scroll.horizontal=false;scroll.vertical=true;scroll.movementType=ScrollRect.MovementType.Clamped;scroll.scrollSensitivity=42;
+   var viewport=Rect("Page viewport",scrollRoot,0,0,1416,565);var hit=viewport.gameObject.AddComponent<Image>();hit.color=Color.clear;viewport.gameObject.AddComponent<RectMask2D>();
+   var content=Rect("Four cell notebook",viewport,0,0,1416,1120);scroll.viewport=viewport;scroll.content=content;
+   Box(content,36,8,1360,1104,new Color(.24f,.23f,.17f,.22f));Box(content,28,0,1360,1104,paper);
+   for(int y=32;y<1104;y+=32)Box(content,30,y,1356,1,new Color(.70f,.75f,.75f,.17f));Box(content,79,0,1,1104,new Color(.71f,.51f,.49f,.19f));
+   for(int y=28;y<1080;y+=70){Ellipse(content,10,y,46,17,new Color(.34f,.37f,.34f,.85f),3,-.28f);Box(content,52,y+1,6,6,ink);}
+   Label(content,"과목 : 상상 / 이름 : 공책 속 친구들",100,12,900,40,23);Label(content,"총 10명 · "+(rosterPage+1)+"쪽",1100,12,235,40,23,TextAnchor.MiddleRight);
+   var line=new Color(.45f,.50f,.46f,.45f);Box(content,100,60,1230,1,line);Box(content,715,80,1,970,line);Box(content,100,565,1230,1,line);
+   string[] scribbles={"용감함!!","마법 쓸 수 있음","백발백중 ↗","든든한 친구","아프면 불러!","엄청 빠름","여우도 친구야","어둠의 힘…","검 + 마법!","탕! 탕!"};
+   int start=rosterPage*4;
+   for(int k=0;k<4;k++){
+    int id=start+k;float x=100+k%2*615,y=75+k/2*490;
+    if(id>=data.roles.Length){Label(content,"다음 친구는\n어떤 모습일까?",x+90,y+120,430,180,39,TextAnchor.MiddleCenter);Label(content,"아직 그리지 않은 페이지",x+90,y+320,430,60,25,TextAnchor.MiddleCenter);continue;}
+    var r=data.roles[id];
+    var card=Button(content,"",x,y,615,480,()=>{rosterOffset=content.anchoredPosition.y;rosterNotice="";if(party.Contains(id))party.Remove(id);else if(party.Count<4)party.Add(id);else rosterNotice="이미 4명입니다. 바꿀 친구의 동그라미를 먼저 지워 주세요.";Roster();},true,Color.clear);
+    Label(card.transform,"No. "+(id+1).ToString("00"),20,10,250,55,37);Label(card.transform,"HP  "+r.hp+" / "+r.hp+"\nMP  "+r.mp+" / "+r.mp+"\n공격  "+r.atk,325,8,255,90,23,TextAnchor.UpperRight);
+    Art(card.transform,PaperArt.Hero(id),200,96,205,170);var note=Label(card.transform,scribbles[id],415,195,175,60,22,TextAnchor.MiddleCenter);note.rectTransform.localEulerAngles=new Vector3(0,0,8);
+    Label(card.transform,"이름 :",20,270,85,42,22);Label(card.transform,r.name,105,268,340,46,33);
+    int order=party.IndexOf(id);Label(card.transform,order>=0?(order+1)+"번 동료":"○ 골라주기",435,273,160,40,22,TextAnchor.MiddleRight);if(order>=0){float w=Mathf.Min(340,r.name.Length*26+35);Ellipse(card.transform,96,270,w,43,new Color(.30f,.38f,.45f,.82f),2.1f,.015f);Ellipse(card.transform,98,272,w+3,40,new Color(.30f,.38f,.45f,.35f),1.1f,-.01f);}
+    Box(card.transform,20,316,575,1,line);Label(card.transform,r.tag,20,320,575,32,22);
+    for(int a=0;a<3;a++){var ability=r.skills[a];Label(card.transform,(a+1)+". "+ability.name+"   MP "+ability.cost,20,351+a*42,570,27,23);Label(card.transform,SkillNote(ability),42,376+a*42,550,22,19);}
+   }
+   Box(content,100,1057,1230,1,line);Label(content,"※ 먼저 고른 친구부터 행동! 동그라미를 다시 누르면 취소.",100,1065,1060,35,22);Label(content,"— "+(rosterPage+1)+" —",1200,1065,120,35,24,TextAnchor.MiddleCenter);
+   var track=Box(scrollRoot,1420,0,12,565,new Color(.38f,.36f,.23f,.18f));track.raycastTarget=true;var bar=track.gameObject.AddComponent<Scrollbar>();var handle=Box(track.transform,0,0,12,100,new Color(.40f,.44f,.35f,.65f));handle.raycastTarget=true;handle.rectTransform.pivot=new Vector2(.5f,.5f);handle.rectTransform.anchorMin=Vector2.zero;handle.rectTransform.anchorMax=Vector2.one;handle.rectTransform.sizeDelta=Vector2.zero;handle.rectTransform.anchoredPosition=Vector2.zero;bar.handleRect=handle.rectTransform;bar.targetGraphic=handle;bar.direction=Scrollbar.Direction.BottomToTop;scroll.verticalScrollbar=bar;
+   Canvas.ForceUpdateCanvases();content.anchoredPosition=new Vector2(0,Mathf.Clamp(rosterOffset,0,555));
+   Label(root,"마우스 휠 또는 드래그로 아래 칸 보기",100,842,800,35,22);Button(root,"← 앞장",100,885,190,55,()=>{rosterPage--;rosterOffset=0;Roster();},rosterPage>0,Hex("#ebe7d6"));Label(root,(rosterPage+1)+" / 3쪽",310,885,180,55,26,TextAnchor.MiddleCenter);Button(root,"뒷장 →",510,885,190,55,()=>{rosterPage++;rosterOffset=0;Roster();},rosterPage<2,Hex("#ebe7d6"));
+   Label(root,"우리 용사단  "+party.Count+" / 4",790,880,330,45,29);Button(root,"포스트잇 친구 선택 →",1130,882,370,65,()=>Friends(false,StartBattle),party.Count==4,Hex("#e6e7d4"));Label(root,rosterNotice.Length>0?rosterNotice:"페이지를 넘겨도 골라둔 친구는 그대로예요.",100,950,1360,35,23);
   }
   void Note(Transform parent,int id,float x,float y,float w,float h){var f=data.companions[id];var note=Box(parent,x,y,w,h,Hex(f.color));Box(note.transform,0,0,w,20,new Color(.6f,.5f,.2f,.15f));var tape=Box(note.transform,w*.44f,-15,30,50,Hex("#78b6bf"));tape.rectTransform.localEulerAngles=new Vector3(0,0,-8);Art(note.transform,PaperArt.Friend(id),10,30,w-20,h-90,false);Label(note.transform,f.name,10,h-62,w-20,48,Mathf.RoundToInt(w/10),TextAnchor.MiddleCenter);}
   void Friends(bool inBattle,Action done)
