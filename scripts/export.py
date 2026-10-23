@@ -5,7 +5,7 @@ from html import escape
 p=Path(__file__).resolve().parents[1]
 html=(p/'index.html').read_text()
 css=re.sub(r"@import url\([^;]+;\s*",'',(p/'style.css').read_text())
-js='\n'.join(re.sub(r'^import .*?;\s*','',(p/name).read_text(),flags=re.M).replace('export const ','const ').replace('export function ','function ') for name in ['battle.js','save.js','animation.js','scene.js','prologue.js','app.js'])
+js='\n'.join(re.sub(r'^import .*?;\s*','',(p/name).read_text(),flags=re.M).replace('export const ','const ').replace('export function ','function ') for name in ['companions.js','battle.js','save.js','animation.js','scene.js','prologue.js','app.js'])
 for asset in (p/'assets').iterdir():
  ref='assets/'+asset.name
  if ref not in css and ref not in js and ref not in html:continue

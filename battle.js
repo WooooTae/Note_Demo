@@ -1,3 +1,4 @@
+import {companions} from './companions.js';
 export const roles=[
  {id:0,name:'불꽃 기사',tag:'화염 · 근접',desc:'불꽃을 두른 검으로 앞장서는 용사.',color:'#c05c3c',icon:'⚔',skill:'화염 참격',hp:120,mp:24,atk:18,cost:8,power:42,effect:'fire'},
  {id:1,name:'푸른 마법사',tag:'별빛 · 마법',desc:'작은 지팡이에 밤하늘의 힘을 담아요.',color:'#527caa',icon:'✦',skill:'별빛 마법',hp:80,mp:36,atk:12,cost:9,power:48,effect:'magic'},
@@ -42,7 +43,7 @@ export function createBattle(ids=[0,1,2,3],encounter=0){
  if(!validParty(ids))throw new Error('서로 다른 용사 4명을 선택하세요.');
  if(!Number.isInteger(encounter)||encounter< -1||encounter>2)throw new Error('잘못된 전투 구간입니다.');
  const enemies=(encounter===-1?enemyDefinitions:encounters[encounter].enemies).map(e=>({...e}));
- return {party:ids.map(id=>({...roles[id],maxHp:roles[id].hp,maxMp:roles[id].mp,guard:false,taped:false})),encounter,enemies,enemy:enemies[0],target:0,summon:null,turn:0,round:1,status:'playing',log:[encounter===-1?'이전 모험을 이어갑니다.':`1스테이지 ${encounter+1}/3 · ${encounters[encounter].name}! 모든 적을 물리치세요.`],last:null};
+ return {party:ids.map(id=>({...roles[id],maxHp:roles[id].hp,maxMp:roles[id].mp,guard:false,taped:false})),encounter,enemies,enemy:enemies[0],target:0,companion:0,companionUsed:false,summon:null,turn:0,round:1,status:'playing',log:[encounter===-1?'이전 모험을 이어갑니다.':`1스테이지 ${encounter+1}/3 · ${encounters[encounter].name}! 모든 적을 물리치세요.`],last:null};
 }
 function finishVictory(state){
  if(state.enemies.some(e=>e.hp>0))return false;
@@ -53,6 +54,7 @@ export function advanceEncounter(state){
  if(state.status!=='cleared'||state.encounter<0||state.encounter>=2||state.enemies.some(e=>e.hp>0))return false;
  const next=createBattle(state.party.map(p=>p.id),state.encounter+1);
  next.party.forEach((p,i)=>{const old=state.party[i];p.hp=old.hp>0?Math.min(p.maxHp,old.hp+Math.ceil(p.maxHp*.35)):Math.ceil(p.maxHp*.25);p.mp=Math.min(p.maxMp,old.mp+14);});
+ next.companion=state.companion;
  next.log=[...state.log.slice(-30),'휴식: 생존자 HP 35% 회복 · 쓰러진 동료 HP 25%로 복귀 · MP +14 · 소환 종료',...next.log];
  Object.assign(state,next);return true;
 }
@@ -70,10 +72,11 @@ export function tapeTarget(state){
 export function enemyIntent(state){return state.enemies.filter(e=>e.hp>0).map(e=>{const tape=tapeTarget(state);if(e.id===0&&tape>=0)return `${e.name}: 테이프 봉인 → ${state.party[tape].name} (다음 행동 1회 불가 · 방어/보호로 막기)`;const p=enemyAttack(state,e.id);return `${e.name}: ${p.rage?'광폭 ':''}${p.heavy?'강공 ':''}${p.all?'전체':'1명'} ${p.damage}`;}).join(' / ')||'모든 적 처치';}
 export function selectTarget(state,target){if(state.status!=='playing'||!Number.isInteger(target)||!state.enemies[target]||state.enemies[target].hp<=0)return false;state.target=target;return true;}
 export function act(state,action,skillIndex=0){
- if(state.status!=='playing'||!['attack','skill','guard','skip'].includes(action))return false;
+ if(state.status!=='playing'||!['attack','skill','guard','skip','companion'].includes(action))return false;
  const hero=state.party[state.turn];
  if(hero?.taped?action!=='skip':action==='skip')return false;
- const ability=action==='skill'&&Number.isInteger(skillIndex)?skillsFor(hero||{})?.[skillIndex]:null;
+ if(action==='companion'&&(state.companionUsed||!companions[state.companion]))return false;
+ const ability=action==='companion'?{...companions[state.companion],name:companions[state.companion].skill}:action==='skill'&&Number.isInteger(skillIndex)?skillsFor(hero||{})?.[skillIndex]:null;
  if(!hero||hero.hp<=0||(action==='skill'&&(!ability||hero.mp<ability.cost)))return false;
  if(!state.enemies[state.target]||state.enemies[state.target].hp<=0)state.target=state.enemies.findIndex(e=>e.hp>0);
  if(state.target<0)return false;
@@ -82,6 +85,7 @@ export function act(state,action,skillIndex=0){
  if(action==='skip'){hero.taped=false;state.log.push(`${hero.name}: 테이프 때문에 이번 행동을 쉬었다. 테이프가 떨어졌다!`);}
  else if(action==='guard'){hero.guard=true;hero.mp=Math.min(hero.maxMp,hero.mp+5);state.log.push(`${hero.name}: 방어! 다음 반격 피해 감소 · MP +5`);}
  else {
+  if(action==='companion'){state.companionUsed=true;state.log.push(`포스트잇 소환! ${companions[state.companion].name}이 도와주러 왔다!`);}
   if(ability)hero.mp-=ability.cost;
   const power=ability?ability.power:hero.atk;
   state.enemies.forEach((e,i)=>{if(e.hp>0&&(i===target||ability?.area)){damageByTarget[i]=Math.min(e.hp,power);e.hp-=damageByTarget[i];}});

@@ -162,7 +162,7 @@ export function mountScene(canvas,state,getEvent,onTarget,entrance=false){
   const t=now/1000,ev=getEvent(),dt=ev?Math.max(0,(now-ev.start)/1000):0;
   if(ev!==lastEvent){lastEvent=ev;impactSound=false;counterSound=false;}
   if(ev&&dt>=.6&&!ev.previewed){ev.previewed=true;ev.onImpact?.();}if(ev?.summonAttack&&dt>=1.12&&!ev.summonPreviewed){ev.summonPreviewed=true;ev.onSummon?.();}if(ev?.counter&&dt>=ACTION_SECONDS+.39&&!ev.counterPreviewed){ev.counterPreviewed=true;ev.onCounter?.();}
-  const pose=ev?actionPose(dt,ev.kind,ev.action):null,heal=ev?.kind==='heal'&&ev.action==='skill',attack=ev&&!['guard','skip'].includes(ev.action)&&!heal;
+  const pose=ev?actionPose(dt,ev.kind,ev.action):null,heal=ev?.kind==='heal'&&['skill','companion'].includes(ev.action),attack=ev&&!['guard','skip','companion'].includes(ev.action)&&!heal;
   const age=dt-.60,enemyT=ev?.counter?dt-ACTION_SECONDS:-1,enemyHit=enemyT>=.39&&enemyT<.8;
   const palette=ev?palettes[state.party[ev.actor].id]:palettes[0],skill=ev?.action==='skill';
   const target=ev?.target??state.target,[bx,by]=enemyPositions[target],[kingX,kingY]=enemyPositions[0],tx=bx-15,ty=by-(target===0?leadHeight*.46:65);

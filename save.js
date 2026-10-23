@@ -1,15 +1,16 @@
 import {createBattle,validParty} from './battle.js';
 export const SAVE_KEY='notebook-heroes-save-v1';
 export const PARTY_KEY='notebook-heroes-party-v1';
-export function serializeSave(state){return JSON.stringify({version:4,savedAt:Date.now(),battle:state});}
+export function serializeSave(state){return JSON.stringify({version:5,savedAt:Date.now(),battle:state});}
 export function restoreSave(raw){
  try{
-  const data=JSON.parse(raw),b=data?.battle;if(![1,2,3,4].includes(data?.version)||!b||!validParty(b.party?.map(p=>p.id)))return null;
+  const data=JSON.parse(raw),b=data?.battle;if(![1,2,3,4,5].includes(data?.version)||!b||!validParty(b.party?.map(p=>p.id)))return null;
   if(!Number.isFinite(data.savedAt)||data.savedAt<=0)return null;
   const encounter=data.version<3?-1:b.encounter;
   if(!Number.isInteger(encounter)||encounter< -1||encounter>2)return null;
   const s=createBattle(b.party.map(p=>p.id),encounter);
-  for(let i=0;i<4;i++){const src=b.party[i],p=s.party[i];if(!Number.isInteger(src.hp)||src.hp<0||src.hp>p.maxHp||!Number.isInteger(src.mp)||src.mp<0||src.mp>p.maxMp||typeof src.guard!=='boolean')return null;p.hp=src.hp;p.mp=src.mp;p.guard=src.guard;if(data.version===4){if(typeof src.taped!=='boolean'||src.taped&&(src.hp===0||encounter!==2))return null;p.taped=src.taped;}}
+  if(data.version>=5){if(!Number.isInteger(b.companion)||b.companion<0||b.companion>4||typeof b.companionUsed!=='boolean')return null;s.companion=b.companion;s.companionUsed=b.companionUsed;}
+  for(let i=0;i<4;i++){const src=b.party[i],p=s.party[i];if(!Number.isInteger(src.hp)||src.hp<0||src.hp>p.maxHp||!Number.isInteger(src.mp)||src.mp<0||src.mp>p.maxMp||typeof src.guard!=='boolean')return null;p.hp=src.hp;p.mp=src.mp;p.guard=src.guard;if(data.version>=4){if(typeof src.taped!=='boolean'||src.taped&&(src.hp===0||encounter!==2))return null;p.taped=src.taped;}}
   if(!Number.isInteger(b.enemy?.hp)||b.enemy.hp<0||b.enemy.hp>s.enemy.maxHp||!Number.isInteger(b.round)||b.round<1||b.round>100000)return null;
   if(data.version===1){s.enemies[0].hp=b.enemy.hp;s.enemies[1].hp=0;s.enemies[2].hp=0;s.target=0;}
   else{
