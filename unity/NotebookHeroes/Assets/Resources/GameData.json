@@ -1,0 +1,599 @@
+{
+  "roles": [
+    {
+      "id": 0,
+      "name": "불꽃 기사",
+      "tag": "화염 · 근접",
+      "desc": "불꽃을 두른 검으로 앞장서는 용사.",
+      "color": "#c05c3c",
+      "icon": "⚔",
+      "skill": "화염 참격",
+      "hp": 120,
+      "mp": 24,
+      "atk": 18,
+      "cost": 8,
+      "power": 42,
+      "effect": "fire",
+      "skills": [
+        {
+          "name": "화염 참격",
+          "cost": 8,
+          "power": 42,
+          "effect": "fire"
+        },
+        {
+          "name": "불꽃 회오리",
+          "cost": 12,
+          "power": 26,
+          "effect": "fire",
+          "area": true
+        },
+        {
+          "name": "불굴의 검",
+          "cost": 6,
+          "power": 24,
+          "effect": "fire",
+          "guard": "self"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "name": "푸른 마법사",
+      "tag": "별빛 · 마법",
+      "desc": "작은 지팡이에 밤하늘의 힘을 담아요.",
+      "color": "#527caa",
+      "icon": "✦",
+      "skill": "별빛 마법",
+      "hp": 80,
+      "mp": 36,
+      "atk": 12,
+      "cost": 9,
+      "power": 48,
+      "effect": "magic",
+      "skills": [
+        {
+          "name": "별빛 마법",
+          "cost": 9,
+          "power": 48,
+          "effect": "magic"
+        },
+        {
+          "name": "유성우",
+          "cost": 15,
+          "power": 30,
+          "effect": "magic",
+          "area": true
+        },
+        {
+          "name": "별빛 집중포",
+          "cost": 18,
+          "power": 70,
+          "effect": "magic"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "숲의 궁수",
+      "tag": "바람 · 연속",
+      "desc": "숲의 바람처럼 빠르고 정확한 화살.",
+      "color": "#66805a",
+      "icon": "➶",
+      "skill": "연속 사격",
+      "hp": 90,
+      "mp": 24,
+      "atk": 20,
+      "cost": 8,
+      "power": 40,
+      "effect": "arrow",
+      "skills": [
+        {
+          "name": "연속 사격",
+          "cost": 8,
+          "power": 40,
+          "effect": "arrow"
+        },
+        {
+          "name": "화살비",
+          "cost": 12,
+          "power": 24,
+          "effect": "arrow",
+          "area": true
+        },
+        {
+          "name": "바람 저격",
+          "cost": 14,
+          "power": 62,
+          "effect": "arrow"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "빛의 창술사",
+      "tag": "빛 · 보호",
+      "desc": "황금빛 창으로 동료를 지켜요.",
+      "color": "#b09248",
+      "icon": "✧",
+      "skill": "수호의 창",
+      "hp": 110,
+      "mp": 24,
+      "atk": 16,
+      "cost": 8,
+      "power": 32,
+      "effect": "protect",
+      "skills": [
+        {
+          "name": "수호의 창",
+          "cost": 8,
+          "power": 32,
+          "effect": "protect",
+          "guard": "party"
+        },
+        {
+          "name": "여명의 결계",
+          "cost": 12,
+          "power": 0,
+          "heal": 12,
+          "effect": "heal",
+          "guard": "party"
+        },
+        {
+          "name": "태양 관통",
+          "cost": 14,
+          "power": 55,
+          "effect": "protect"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "장미 성직자",
+      "tag": "장미 · 회복",
+      "desc": "지워진 용기를 다시 피어나게 해요.",
+      "color": "#b56c88",
+      "icon": "❀",
+      "skill": "장미의 축복",
+      "hp": 90,
+      "mp": 40,
+      "atk": 13,
+      "cost": 10,
+      "power": 0,
+      "heal": 30,
+      "effect": "heal",
+      "skills": [
+        {
+          "name": "장미의 축복",
+          "cost": 10,
+          "power": 0,
+          "effect": "heal",
+          "heal": 30
+        },
+        {
+          "name": "만개하는 기적",
+          "cost": 18,
+          "power": 0,
+          "heal": 45,
+          "effect": "heal"
+        },
+        {
+          "name": "장미 가시",
+          "cost": 8,
+          "power": 38,
+          "effect": "magic"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "그림자 도적",
+      "tag": "그림자 · 쌍검",
+      "desc": "잉크보다 빠르게 스치는 두 개의 칼날.",
+      "color": "#806498",
+      "icon": "☽",
+      "skill": "그림자 쌍검",
+      "hp": 85,
+      "mp": 30,
+      "atk": 22,
+      "cost": 10,
+      "power": 52,
+      "effect": "rogue",
+      "skills": [
+        {
+          "name": "그림자 쌍검",
+          "cost": 10,
+          "power": 52,
+          "effect": "rogue"
+        },
+        {
+          "name": "그림자 난무",
+          "cost": 14,
+          "power": 28,
+          "effect": "rogue",
+          "area": true
+        },
+        {
+          "name": "생명 훔치기",
+          "cost": 8,
+          "power": 36,
+          "effect": "drain",
+          "drain": true
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "정령 소환술사",
+      "tag": "정령 · 소환",
+      "desc": "공책의 작은 여우를 동료로 불러요.",
+      "color": "#348f91",
+      "icon": "✺",
+      "skill": "별여우 소환",
+      "hp": 90,
+      "mp": 36,
+      "atk": 13,
+      "cost": 12,
+      "power": 24,
+      "effect": "summon",
+      "skills": [
+        {
+          "name": "별여우 소환",
+          "cost": 12,
+          "power": 24,
+          "effect": "summon",
+          "summon": true
+        },
+        {
+          "name": "정령 쇄도",
+          "cost": 16,
+          "power": 40,
+          "effect": "summon",
+          "summon": true
+        },
+        {
+          "name": "정령 결계",
+          "cost": 12,
+          "power": 0,
+          "heal": 18,
+          "effect": "heal",
+          "guard": "party"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "name": "흑마법사",
+      "tag": "어둠 · 흡수",
+      "desc": "적의 잉크에서 생명력을 되찾아요.",
+      "color": "#8950a0",
+      "icon": "☾",
+      "skill": "영혼 흡수",
+      "hp": 85,
+      "mp": 36,
+      "atk": 16,
+      "cost": 10,
+      "power": 44,
+      "effect": "drain",
+      "skills": [
+        {
+          "name": "영혼 흡수",
+          "cost": 10,
+          "power": 44,
+          "effect": "drain",
+          "drain": true
+        },
+        {
+          "name": "영혼 소용돌이",
+          "cost": 16,
+          "power": 26,
+          "effect": "drain",
+          "area": true,
+          "drain": true
+        },
+        {
+          "name": "심연의 창",
+          "cost": 20,
+          "power": 72,
+          "effect": "drain"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "name": "마검사",
+      "tag": "마력 · 검술",
+      "desc": "푸른 마력을 검에 담아 전장을 가르는 용사.",
+      "color": "#5267bd",
+      "icon": "✧",
+      "skill": "룬 블레이드",
+      "hp": 105,
+      "mp": 30,
+      "atk": 19,
+      "cost": 9,
+      "power": 46,
+      "effect": "runeblade",
+      "skills": [
+        {
+          "name": "룬 블레이드",
+          "cost": 9,
+          "power": 46,
+          "effect": "runeblade"
+        },
+        {
+          "name": "차원 검기",
+          "cost": 14,
+          "power": 29,
+          "effect": "runeblade",
+          "area": true
+        },
+        {
+          "name": "룬의 수호",
+          "cost": 7,
+          "power": 27,
+          "effect": "runeblade",
+          "guard": "self"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "name": "거너",
+      "tag": "탄환 · 원거리",
+      "desc": "두 자루 잉크총으로 경쾌하게 탄막을 펼쳐요.",
+      "color": "#ba7834",
+      "icon": "✹",
+      "skill": "더블 트리거",
+      "hp": 85,
+      "mp": 30,
+      "atk": 21,
+      "cost": 9,
+      "power": 46,
+      "effect": "gun",
+      "skills": [
+        {
+          "name": "더블 트리거",
+          "cost": 9,
+          "power": 46,
+          "effect": "gun"
+        },
+        {
+          "name": "탄막 폭풍",
+          "cost": 14,
+          "power": 28,
+          "effect": "gun",
+          "area": true
+        },
+        {
+          "name": "마탄 저격",
+          "cost": 17,
+          "power": 68,
+          "effect": "gun"
+        }
+      ]
+    }
+  ],
+  "encounters": [
+    {
+      "name": "일반 몬스터",
+      "subtitle": "숲 입구의 낙서들",
+      "enemies": [
+        {
+          "id": 0,
+          "name": "먹물 슬라임",
+          "kind": "slime",
+          "hp": 80,
+          "maxHp": 80,
+          "attack": 8,
+          "style": "single",
+          "heavy": 8
+        },
+        {
+          "id": 1,
+          "name": "잉크 슬라임",
+          "kind": "slime",
+          "hp": 70,
+          "maxHp": 70,
+          "attack": 7,
+          "style": "single",
+          "heavy": 7
+        },
+        {
+          "id": 2,
+          "name": "낙서 해골",
+          "kind": "skeleton",
+          "hp": 90,
+          "maxHp": 90,
+          "attack": 9,
+          "style": "single",
+          "heavy": 9
+        }
+      ]
+    },
+    {
+      "name": "에픽 몬스터",
+      "subtitle": "보랏빛 해골 대장",
+      "enemies": [
+        {
+          "id": 0,
+          "name": "공허의 해골 대장",
+          "kind": "epic",
+          "hp": 260,
+          "maxHp": 260,
+          "attack": 14,
+          "style": "all",
+          "heavy": 24
+        },
+        {
+          "id": 1,
+          "name": "짙은 잉크 슬라임",
+          "kind": "slime",
+          "hp": 80,
+          "maxHp": 80,
+          "attack": 8,
+          "style": "single",
+          "heavy": 8
+        },
+        {
+          "id": 2,
+          "name": "해골 호위병",
+          "kind": "skeleton",
+          "hp": 90,
+          "maxHp": 90,
+          "attack": 10,
+          "style": "single",
+          "heavy": 10
+        }
+      ]
+    },
+    {
+      "name": "보스 몬스터",
+      "subtitle": "잉크의 왕",
+      "enemies": [
+        {
+          "id": 0,
+          "name": "잉크의 왕",
+          "kind": "boss",
+          "hp": 500,
+          "maxHp": 500,
+          "attack": 20,
+          "style": "all",
+          "heavy": 34
+        },
+        {
+          "id": 1,
+          "name": "왕의 잉크 슬라임",
+          "kind": "slime",
+          "hp": 90,
+          "maxHp": 90,
+          "attack": 9,
+          "style": "single",
+          "heavy": 9
+        },
+        {
+          "id": 2,
+          "name": "왕의 해골 근위병",
+          "kind": "skeleton",
+          "hp": 100,
+          "maxHp": 100,
+          "attack": 11,
+          "style": "single",
+          "heavy": 11
+        }
+      ]
+    }
+  ],
+  "companions": [
+    {
+      "id": 0,
+      "name": "꼬마 기사",
+      "title": "내가 앞장설게!",
+      "skill": {
+        "id": 0,
+        "name": "종이검 돌진",
+        "title": "내가 앞장설게!",
+        "skill": "종이검 돌진",
+        "detail": "선택한 적에게 48 피해",
+        "power": 48,
+        "cost": 0,
+        "effect": "fire",
+        "color": "#f5e68d"
+      },
+      "detail": "선택한 적에게 48 피해",
+      "power": 48,
+      "cost": 0,
+      "effect": "fire",
+      "color": "#f5e68d"
+    },
+    {
+      "id": 1,
+      "name": "새싹 궁수",
+      "title": "저기, 찾았다!",
+      "skill": {
+        "id": 1,
+        "name": "낙서 화살비",
+        "title": "저기, 찾았다!",
+        "skill": "낙서 화살비",
+        "detail": "모든 적에게 26 피해",
+        "power": 26,
+        "area": true,
+        "cost": 0,
+        "effect": "arrow",
+        "color": "#dce7a1"
+      },
+      "detail": "모든 적에게 26 피해",
+      "power": 26,
+      "area": true,
+      "cost": 0,
+      "effect": "arrow",
+      "color": "#dce7a1"
+    },
+    {
+      "id": 2,
+      "name": "별 모자 마법사",
+      "title": "별 하나 빌려줄까?",
+      "skill": {
+        "id": 2,
+        "name": "별똥별 한 장",
+        "title": "별 하나 빌려줄까?",
+        "skill": "별똥별 한 장",
+        "detail": "선택한 적에게 60 피해",
+        "power": 60,
+        "cost": 0,
+        "effect": "magic",
+        "color": "#d5d5ef"
+      },
+      "detail": "선택한 적에게 60 피해",
+      "power": 60,
+      "cost": 0,
+      "effect": "magic",
+      "color": "#d5d5ef"
+    },
+    {
+      "id": 3,
+      "name": "꽃잎 치유사",
+      "title": "아픈 데는 없지?",
+      "skill": {
+        "id": 3,
+        "name": "따뜻한 낙서",
+        "title": "아픈 데는 없지?",
+        "skill": "따뜻한 낙서",
+        "detail": "생존한 아군 모두 HP 28 회복",
+        "power": 0,
+        "heal": 28,
+        "cost": 0,
+        "effect": "heal",
+        "color": "#f0d0ca"
+      },
+      "detail": "생존한 아군 모두 HP 28 회복",
+      "power": 0,
+      "heal": 28,
+      "cost": 0,
+      "effect": "heal",
+      "color": "#f0d0ca"
+    },
+    {
+      "id": 4,
+      "name": "양철 방패병",
+      "title": "내 뒤에 숨어!",
+      "skill": {
+        "id": 4,
+        "name": "튼튼한 메모지",
+        "title": "내 뒤에 숨어!",
+        "skill": "튼튼한 메모지",
+        "detail": "아군 전체 보호 · 다음 반격 피해 65% 감소",
+        "power": 0,
+        "guard": "party",
+        "cost": 0,
+        "effect": "shield",
+        "color": "#c9e2db"
+      },
+      "detail": "아군 전체 보호 · 다음 반격 피해 65% 감소",
+      "power": 0,
+      "guard": "party",
+      "cost": 0,
+      "effect": "shield",
+      "color": "#c9e2db"
+    }
+  ]
+}

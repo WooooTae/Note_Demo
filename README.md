@@ -6,6 +6,20 @@
 
 압축을 풀고 `Game.html`을 Edge 또는 Chrome으로 여세요. 설치나 인터넷 연결이 필요 없습니다.
 
+## Unity 프로젝트
+
+**[Unity 프로젝트 ZIP 다운로드](https://github.com/WooooTae/Note_Demo/raw/refs/heads/main/release/Notebook-Heroes-Unity.zip)**
+
+Unity 6.0 LTS에서 열 수 있는 네이티브 C# 이식 프로토타입입니다. 10개 직업·30개 스킬, 동료 5종, 3연전, 테이프 봉인, 파일 저장을 포함합니다. ZIP은 실행 파일이 아닌 소스 프로젝트입니다. 열기·빌드 방법과 검증 제한은 [Unity 안내](unity/NotebookHeroes/README.md)를 참고하세요. 현재 환경에서는 Unity 에디터 Play와 Windows 빌드를 실행하지 못했습니다.
+
+기존 JavaScript와 C# 전투 로직은 80개 시나리오, 4,034번의 행동/전환 결과를 비교해 일치함을 확인했습니다. .NET 8이 설치되어 있다면 다음 명령으로 재검증할 수 있습니다.
+
+```sh
+node scripts/unity-check/generate.mjs unity-fixtures.json
+dotnet run --project scripts/unity-check/UnityLogicCheck.csproj -- unity/NotebookHeroes/Assets/Resources/GameData.json unity-fixtures.json
+python scripts/export_unity.py
+```
+
 ## 플레이
 
 - **게임 시작**: 약 34초의 도입 컷씬을 본 뒤, 10명의 용사 중 서로 다른 4명을 고른 뒤 포스트잇 동료 한 명과 모험을 시작합니다.
