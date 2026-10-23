@@ -47,7 +47,7 @@ export function createBattle(ids=[0,1,2,3],encounter=0){
 function finishVictory(state){
  if(state.enemies.some(e=>e.hp>0))return false;
  state.status=state.encounter>=0&&state.encounter<2?'cleared':'victory';
- state.log.push(state.status==='cleared'?'구간 돌파! 잠깐 쉬고 다음 전투로 이동할 수 있습니다.':'1스테이지 클리어! 보상: 별 조각 30개');return true;
+ state.log.push(state.status==='cleared'?'구간 돌파! 회복 후 다음 전투로 자동 이동합니다.':'1스테이지 클리어! 보상: 별 조각 30개');return true;
 }
 export function advanceEncounter(state){
  if(state.status!=='cleared'||state.encounter<0||state.encounter>=2||state.enemies.some(e=>e.hp>0))return false;
