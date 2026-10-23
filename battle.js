@@ -42,7 +42,7 @@ export function createBattle(ids=[0,1,2,3],encounter=0){
  if(!validParty(ids))throw new Error('서로 다른 용사 4명을 선택하세요.');
  if(!Number.isInteger(encounter)||encounter< -1||encounter>2)throw new Error('잘못된 전투 구간입니다.');
  const enemies=(encounter===-1?enemyDefinitions:encounters[encounter].enemies).map(e=>({...e}));
- return {party:ids.map(id=>({...roles[id],maxHp:roles[id].hp,maxMp:roles[id].mp,guard:false})),encounter,enemies,enemy:enemies[0],target:0,summon:null,turn:0,round:1,status:'playing',log:[encounter===-1?'이전 모험을 이어갑니다.':`1스테이지 ${encounter+1}/3 · ${encounters[encounter].name}! 모든 적을 물리치세요.`],last:null};
+ return {party:ids.map(id=>({...roles[id],maxHp:roles[id].hp,maxMp:roles[id].mp,guard:false,taped:false})),encounter,enemies,enemy:enemies[0],target:0,summon:null,turn:0,round:1,status:'playing',log:[encounter===-1?'이전 모험을 이어갑니다.':`1스테이지 ${encounter+1}/3 · ${encounters[encounter].name}! 모든 적을 물리치세요.`],last:null};
 }
 function finishVictory(state){
  if(state.enemies.some(e=>e.hp>0))return false;
@@ -62,18 +62,25 @@ export function enemyAttack(state,id){
  const damage=state.encounter===-1?(id===0?(heavy?30:18):id===1?5:7):(heavy?e.heavy:e.attack)+(rage?4:0);
  return {damage,all:state.encounter===-1?id===0:e.style==='all',heavy:heavy&&(state.encounter===-1?id===0:e.heavy>e.attack),rage};
 }
-export function enemyIntent(state){return state.enemies.filter(e=>e.hp>0).map(e=>{const p=enemyAttack(state,e.id);return `${e.name}: ${p.rage?'광폭 ':''}${p.heavy?'강공 ':''}${p.all?'전체':'1명'} ${p.damage}`;}).join(' / ')||'모든 적 처치';}
+export function tapeTarget(state){
+ if(state.encounter!==2||state.enemy.hp<=0||state.round%3!==2)return -1;
+ const first=(Math.floor(state.round/3)+1)%4;
+ for(let k=0;k<4;k++){const i=(first+k)%4;if(state.party[i].hp>0)return i;}return -1;
+}
+export function enemyIntent(state){return state.enemies.filter(e=>e.hp>0).map(e=>{const tape=tapeTarget(state);if(e.id===0&&tape>=0)return `${e.name}: 테이프 봉인 → ${state.party[tape].name} (다음 행동 1회 불가 · 방어/보호로 막기)`;const p=enemyAttack(state,e.id);return `${e.name}: ${p.rage?'광폭 ':''}${p.heavy?'강공 ':''}${p.all?'전체':'1명'} ${p.damage}`;}).join(' / ')||'모든 적 처치';}
 export function selectTarget(state,target){if(state.status!=='playing'||!Number.isInteger(target)||!state.enemies[target]||state.enemies[target].hp<=0)return false;state.target=target;return true;}
 export function act(state,action,skillIndex=0){
- if(state.status!=='playing'||!['attack','skill','guard'].includes(action))return false;
+ if(state.status!=='playing'||!['attack','skill','guard','skip'].includes(action))return false;
  const hero=state.party[state.turn];
+ if(hero?.taped?action!=='skip':action==='skip')return false;
  const ability=action==='skill'&&Number.isInteger(skillIndex)?skillsFor(hero||{})?.[skillIndex]:null;
  if(!hero||hero.hp<=0||(action==='skill'&&(!ability||hero.mp<ability.cost)))return false;
  if(!state.enemies[state.target]||state.enemies[state.target].hp<=0)state.target=state.enemies.findIndex(e=>e.hp>0);
  if(state.target<0)return false;
  const target=state.target;
  const healing=state.party.map(()=>0),damageByTarget=state.enemies.map(()=>0);
- if(action==='guard'){hero.guard=true;hero.mp=Math.min(hero.maxMp,hero.mp+5);state.log.push(`${hero.name}: 방어! 다음 반격 피해 감소 · MP +5`);}
+ if(action==='skip'){hero.taped=false;state.log.push(`${hero.name}: 테이프 때문에 이번 행동을 쉬었다. 테이프가 떨어졌다!`);}
+ else if(action==='guard'){hero.guard=true;hero.mp=Math.min(hero.maxMp,hero.mp+5);state.log.push(`${hero.name}: 방어! 다음 반격 피해 감소 · MP +5`);}
  else {
   if(ability)hero.mp-=ability.cost;
   const power=ability?ability.power:hero.atk;
@@ -87,7 +94,7 @@ export function act(state,action,skillIndex=0){
   state.log.push(`${hero.name}의 ${ability?.name||'기본 공격'}! ${result}${ability?.heal?`생존 아군 전체 HP 최대 ${ability.heal} 회복`:''}${ability?.drain?` · HP ${healing[state.turn]} 흡수`:''}${ability?.guard?` · ${ability.guard==='party'?'아군 전체':'자신'} 보호`:''}`);
   damageByTarget.forEach((n,i)=>{if(n>0&&state.enemies[i].hp===0)state.log.push(`${state.enemies[i].name} 처치!`);});
  }
- state.last={actor:state.turn,action,skillIndex:ability?skillIndex:null,skillName:ability?.name,kind:ability?.effect||hero.effect,area:!!ability?.area,guard:ability?.guard||null,drain:!!ability?.drain,target,damage:damageByTarget[target],damageByTarget,healing,enemyHP:state.enemies.map(e=>e.hp),summonAttack:null,enemyStrikes:[],counter:false};
+ state.last={actor:state.turn,action,skillIndex:ability?skillIndex:null,skillName:ability?.name,kind:ability?.effect||hero.effect,area:!!ability?.area,guard:ability?.guard||null,drain:!!ability?.drain,target,damage:damageByTarget[target],damageByTarget,healing,enemyHP:state.enemies.map(e=>e.hp),summonAttack:null,enemyStrikes:[],tapeAttack:null,counter:false};
  if(finishVictory(state))return true;
  let next=state.party.findIndex((h,i)=>i>state.turn&&h.hp>0);
  if(next===-1){
@@ -102,13 +109,15 @@ export function act(state,action,skillIndex=0){
   state.last.counter=true;
   for(let n=0;n<state.enemies.length;n++){
    if(state.enemies[n].hp===0)continue;
+   const taped=tapeTarget(state);
+   if(n===0&&taped>=0){const p=state.party[taped],blocked=p.guard;state.last.tapeAttack={target:taped,blocked};if(!blocked)p.taped=true;state.log.push(blocked?`${p.name}의 보호가 테이프를 막았다!`:`잉크의 왕의 테이프 봉인! ${p.name}의 다음 행동 1회 불가`);continue;}
    const plan=enemyAttack(state,n);
    const living=state.party.map((p,i)=>({p,i})).filter(({p})=>p.hp>0);if(!living.length)break;
    const victims=plan.all?living:[living[(state.round-1+Math.max(0,n-1))%living.length]];
    state.log.push(`${state.enemies[n].name}: ${plan.rage?'광폭! ':''}${plan.heavy?'강력한 ':''}${plan.all?'전체':'집중'} 공격 (${plan.damage})`);
    for(const {p,i} of victims){const hit=Math.min(p.hp,Math.ceil(plan.damage*(p.guard?0.35:1)));p.hp-=hit;state.last.enemyStrikes.push({enemy:n,target:i,damage:hit});}
   }
-  state.party.forEach(h=>h.guard=false);state.round++;next=state.party.findIndex(h=>h.hp>0);
+  state.party.forEach(h=>{h.guard=false;if(h.hp===0)h.taped=false;});state.round++;next=state.party.findIndex(h=>h.hp>0);
   if(state.summon&&!state.party.some(p=>p.id===state.summon.owner&&p.hp>0))state.summon=null;
   if(next===-1){state.status='defeat';state.log.push('낙서들이 잠들었다. 다시 페이지를 펼쳐보자.');}
  }
